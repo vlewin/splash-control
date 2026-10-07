@@ -1,0 +1,20 @@
+name: Splash server issue (upstream)
+description: The splash runtime itself misbehaves, not Splash Control
+title: ""
+labels: [upstream]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Splash Control is a client. If the splash server returns malformed JSON,
+        crashes, or misbehaves **without Splash Control running**, the fix belongs
+        upstream in [incoai/splash](https://github.com/incoai/splash) — please open
+        the issue there. Use this form only when the server behaves correctly but
+        Splash Control renders or handles its data wrongly.
+  - type: textarea
+    id: how-found
+    attributes:
+      label: How did Splash Control surface it?
+      description: Which tab or field showed the wrong value, or what did /status contain?
+    validations:
+      required: true

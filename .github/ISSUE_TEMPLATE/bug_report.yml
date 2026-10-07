@@ -1,0 +1,54 @@
+name: Bug report
+description: Something in Splash Control misbehaves
+title: ""
+labels: [bug]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What you did and what you saw, in one or two sentences.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: The exact sequence — which tab, which action. "It doesn't work" is not reproducible.
+    validations:
+      required: true
+  - type: input
+    id: app-version
+    attributes:
+      label: App version
+      description: From the Info tab.
+    validations:
+      required: true
+  - type: input
+    id: macos-version
+    attributes:
+      label: macOS version
+      placeholder: e.g. 26.4
+    validations:
+      required: true
+  - type: input
+    id: server-version
+    attributes:
+      label: Splash server version
+      description: Output of `splash --version`.
+    validations:
+      required: true
+  - type: input
+    id: model
+    attributes:
+      label: Model
+      description: OWNER/REPO[:VARIANT]
+    validations:
+      required: false
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs and screenshots
+      description: Paste the relevant lines from the Logs tab (the app's own log). If the issue is visual, attach a screenshot.
+    validations:
+      required: false

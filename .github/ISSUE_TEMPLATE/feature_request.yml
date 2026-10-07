@@ -1,0 +1,12 @@
+name: Feature request
+description: Propose an idea for Splash Control
+title: ""
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+      description: What are you doing today that this would make easier?
+    validations:
+      required: true
