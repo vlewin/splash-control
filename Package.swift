@@ -21,8 +21,10 @@ let package = Package(
     // Platform floor matches splash 1.2.1 (macOS 26.4+, GPU family 9).
     platforms: [.macOS("26.4")],
     targets: [
-        // DTOs live in a small public library: SPM forbids test targets from
-        // depending on executable targets, and the app imports the kit.
+        // DTOs live in a small public library: the app is macOS-gated above,
+        // the kit stays cross-platform and testable on any OS. (SPM 5.5+
+        // allows test targets to depend on executable targets; the split is
+        // a portability choice, not a tool limitation.)
         .target(
             name: "SplashControlKit",
             path: "Sources/SplashControlKit"

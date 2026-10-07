@@ -130,7 +130,7 @@ Splash Control (`SplashControl`) is a macOS menu-bar app that starts, monitors, 
 There is **no backend of our own.** The runtime lives in a separate repository (`incoai/splash`) — never edit it from here. Upstream findings go in the report, tagged *upstream*.
 
 ### Locked stack
-- **Language**: Swift, `swift-tools-version:5.10`, app target `SplashControl` + `SplashControlKit` DTO library (hosts the test target; SPM forbids test→executable deps).
+- **Language**: Swift, `swift-tools-version:5.10`, app target `SplashControl` + `SplashControlKit` DTO library (hosts the test target; SPM 5.5+ allows test→executable deps, so the kit exists to keep tests cross-platform while the app stays macOS-gated).
 - **Platform floor**: `Package.swift` declares `.macOS("26.4")`, mirroring the runtime's floor (splash 1.2.x requires **Apple M3+ / macOS 26.4+** — installed release 1.2.1, verified 2026-10-07). Keep `Resources/Info.plist`'s `LSMinimumSystemVersion` in agreement.
 - **UI**: SwiftUI + AppKit menu-bar integration (`TrayController`).
 - **Zero external SPM dependencies.** `Package.swift` has none; adding one needs a tradeoff analysis and explicit approval (see §15).

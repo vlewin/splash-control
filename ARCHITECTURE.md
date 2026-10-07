@@ -15,7 +15,7 @@ There is **no backend of our own.** The splash server is the system under observ
 
 ## 2. Locked stack & Invariants
 
-- **Language**: Swift, `swift-tools-version:5.10`, a `SplashControl` executable target, a small `SplashControlKit` DTO library (`StatusDTO`, `SplashClient` — SPM forbids test targets from depending on executables), and a `SplashControlKitTests` target.
+- **Language**: Swift, `swift-tools-version:5.10`, a `SplashControl` executable target, a small `SplashControlKit` DTO library (`StatusDTO`, `SplashClient` — kept as a library so the tests stay cross-platform; SPM 5.5+ allows test targets to depend on executable targets), and a `SplashControlKitTests` target.
 - **Platform floor**: `Package.swift` declares `.macOS("26.4")`, mirroring the runtime's floor (splash 1.2.x requires **Apple M3+ / macOS 26.4+**). `Resources/Info.plist`'s `LSMinimumSystemVersion` must match.
 - **UI**: SwiftUI + AppKit menu-bar integration (`TrayController`).
 - **Zero external SPM dependencies**: `Package.swift` has none and none get added.
