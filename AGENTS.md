@@ -117,7 +117,8 @@ When running CLI commands via bash/zsh, use **Rust Token Killer (`rtk`)** to min
 ## 9. Project Learnings & Self-improvement loop
 This section accumulates concrete corrections. When corrected on your approach, append a concrete one-line rule below ("Always use X for Y", not "be careful with Y"). If an existing rule covers it, tighten it.
 
-- *Learnings log*: (Empty — agent appends here upon user correction.)
+- *Learnings log*:
+  - Never commit or push without explicit user approval — stage, show the diff and proposed message, wait for confirmation.
 - *Rotation / prune test*: keep this log to ≤ 10 entries (fold durable rules into their section when it exceeds); every few weeks, delete any line whose removal would cause no mistake.
 - *Size budget*: ≤ ~320 lines / ≤ 20 KB — 2026 guidance (vLLM caps at 200/300 lines, Codex truncates at 32 KiB). New detail goes to a reference doc, not here.
 
