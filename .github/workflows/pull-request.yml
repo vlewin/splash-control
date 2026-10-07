@@ -20,7 +20,10 @@ jobs:
       - name: Install Swift toolchain
         uses: swift-actions/setup-swift@v2
         with:
-          swift-version: "6.4"
+          # setup-swift@v2 keeps a hardcoded version list that tops out at
+          # 6.2.1 — newer releases (6.3/6.4) are unknown to it and fail at
+          # install time. 6.2.1 ships the Testing module, which the suite needs.
+          swift-version: "6.2.1"
 
       # Basic checks only: the kit is Foundation-only, so the DTO suite builds
       # and runs on Linux. App target, check scripts (pmset) and the release
