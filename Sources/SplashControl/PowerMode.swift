@@ -57,7 +57,9 @@ enum PowerMode {
     cache.withLock { $0.at = .distantPast }
   }
 
-  private static func probe() -> Int? {
+  /// Exposed (not private) so check_core.sh can pin "the cache passes the
+  /// live `pmset -g` answer through" without duplicating the parse.
+  static func probe() -> Int? {
     let task = Process()
     task.executableURL = URL(fileURLWithPath: "/usr/bin/pmset")
     task.arguments = ["-g"]

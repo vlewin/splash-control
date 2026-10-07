@@ -2084,9 +2084,13 @@ do {
 // pin down is that invalidate() forces a re-read and a fresh answer survives a
 // failed probe.
 @MainActor func powerModeChecks() async {
+    // Pin against the live `pmset -g` answer, not "non-nil": a machine (or
+    // runner VM) that never selected a power mode emits no `powermode` line,
+    // so the live value is legitimately nil there.
+    let live = PowerMode.probe()
     PowerMode.invalidate()
     let first = await PowerMode.current()
-    check("power mode is read live", first != nil, true)
+    check("power mode is read live", first, live)
     let second = await PowerMode.current()
     check("power mode is stable inside the TTL", second, first)
     PowerMode.invalidate()
