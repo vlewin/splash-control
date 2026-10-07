@@ -124,7 +124,7 @@ This section accumulates concrete corrections. When corrected on your approach, 
 ## 10. Project context & Invariant constraints
 
 ### System boundary
-Splash Control (`SplashControl`) is a macOS menu-bar app that starts, monitors, and controls a running `splash` LLM server. It polls `GET /status` on `127.0.0.1:9000` and renders six tabs (**Live, Metrics, Statistics, Logs, Settings, Info**).
+Splash Control (`SplashControl`) is a macOS menu-bar app that starts, monitors, and controls a running `splash` LLM server. It polls `GET /status` on `127.0.0.1:8000` and renders six tabs (**Live, Metrics, Statistics, Logs, Settings, Info**).
 
 There is **no backend of our own.** The runtime lives in a separate repository (`incoai/splash`) — never edit it from here. Upstream findings go in the report, tagged *upstream*.
 
@@ -225,7 +225,7 @@ copy the mistake forward.
 1. **This file & [ARCHITECTURE.md](ARCHITECTURE.md)** — process, conventions, and runtime contract.
 2. **[DESIGN.md](DESIGN.md)** — design system tokens, colors, typography, and optical alignment.
 3. **The live server** — for anything about schema or behaviour, probe it:
-   `curl -s http://127.0.0.1:9000/status`. For schema facts this outranks what
+   `curl -s http://127.0.0.1:8000/status`. For schema facts this outranks what
    any file says, including ARCHITECTURE.md § 4: docs go stale, the server does not.
 4. **`incoai/splash` source** — read the code, don't guess. A local checkout is
    a moving target; pin it against the installed release before trusting it.
@@ -253,7 +253,7 @@ Reply with these eight sections, in this order. Do not reorder or omit:
 1. **Files read** — each file touched + one line of its pre-edit state.
 2. **Plan** — the plan written before implementing.
 3. **Changes** — file-by-file: what changed and why.
-4. **Verification** — `swift build`; check scripts; runtime probe (live `:9000` server, or `Scripts/sample_status.py` if unavailable — say which); UI check with the `dist/Splash.app` bundle path; stale/nil handling only if touching `StatusDTO`/polling. Cite evidence per claim; for behaviour, state the observation method — unobserved behaviour is ⚠️ with the reason stated. Source-only confirmation is inference, not verification.
+4. **Verification** — `swift build`; check scripts; runtime probe (live `:8000` server, or `Scripts/sample_status.py` if unavailable — say which); UI check with the `dist/Splash.app` bundle path; stale/nil handling only if touching `StatusDTO`/polling. Cite evidence per claim; for behaviour, state the observation method — unobserved behaviour is ⚠️ with the reason stated. Source-only confirmation is inference, not verification.
 5. **Acceptance criteria** — each: ✅ (machine-checked) / ⚠️ (reasoned but unobserved) / ❌, with evidence.
 6. **Deviations from AGENTS.md** — anything done differently and why. "None" is valid. A skipped required step counts as a deviation — declare it here, never as "not needed" elsewhere.
 7. **New issues / incidental cleanups** — unrelated touch-ups with file paths, never silent.

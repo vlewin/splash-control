@@ -6,7 +6,7 @@ Technical architecture, runtime contract, and system integration for Splash Cont
 
 ## 1. System boundary & Architecture overview
 
-Splash Control is a macOS menu-bar app (SwiftUI + AppKit) that starts, monitors, and controls a running `splash` LLM server. It resolves the `splash` binary (config override → `/opt/homebrew/bin/splash` → `/usr/local/bin/splash` → `PATH`), spawns `splash serve`, polls `GET /status` on `127.0.0.1:9000`, and renders six tabs:
+Splash Control is a macOS menu-bar app (SwiftUI + AppKit) that starts, monitors, and controls a running `splash` LLM server. It resolves the `splash` binary (config override → `/opt/homebrew/bin/splash` → `/usr/local/bin/splash` → `PATH`), spawns `splash serve`, polls `GET /status` on `127.0.0.1:8000`, and renders six tabs:
 **Live, Metrics, Statistics, Logs, Settings, Info** (benchmark UI lives inside Statistics).
 
 There is **no backend of our own.** The splash server is the system under observation; this app only reads it. The runtime lives in a separate repository (`incoai/splash`).

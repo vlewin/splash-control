@@ -21,7 +21,7 @@ Native macOS menu-bar controller and real-time telemetry dashboard for the [Spla
 
 ## Overview
 
-**Splash Control** is a lightweight macOS menu-bar companion for [IncoAI's Splash](https://github.com/incoai/splash) runtime. It manages the local `splash serve` engine on `127.0.0.1:9000`, watches engine state via `/status`, switches models in one click, and shows a 6-tab telemetry dashboard.
+**Splash Control** is a lightweight macOS menu-bar companion for [IncoAI's Splash](https://github.com/incoai/splash) runtime. It manages the local `splash serve` engine on `127.0.0.1:8000`, watches engine state via `/status`, switches models in one click, and shows a 6-tab telemetry dashboard.
 
 Built with SwiftUI, AppKit, and Apple Charts. No external packages.
 
@@ -141,7 +141,7 @@ make check
 
 ## Client Integration
 
-Splash Control serves an OpenAI-compatible API on `http://127.0.0.1:9000/v1`
+Splash Control serves an OpenAI-compatible API on `http://127.0.0.1:8000/v1`
 for coding assistants and local LLM clients. One concept explains every
 setup failure: **the server accepts a single model id, the one it loaded,
 and nothing else.** A request naming anything else fails with
@@ -151,7 +151,7 @@ config holding the old id.
 Find the current id in the Live tab header, or ask the server:
 
 ```bash
-curl http://127.0.0.1:9000/v1/models
+curl http://127.0.0.1:8000/v1/models
 ```
 
 ### cURL Quick Test
@@ -160,7 +160,7 @@ The Live view has a `curl` button that copies a working request with the
 right id already filled in. By hand it looks like this:
 
 ```bash
-curl http://127.0.0.1:9000/v1/chat/completions \
+curl http://127.0.0.1:8000/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
     "model": "incoai/Qwen3.8-27B-Splash",
@@ -176,7 +176,7 @@ omit `model` entirely — with a single model loaded, the server uses it
 These harnesses require a model name in their settings, so omission is not
 an option:
 
-- **Base URL**: `http://127.0.0.1:9000/v1`
+- **Base URL**: `http://127.0.0.1:8000/v1`
 - **API Key**: Any dummy string (e.g. `splash-local`) or configured key.
 - **Model Name**: `default` — the stable alias the tray serves by default.
   It keeps working across model switches; change or clear it in

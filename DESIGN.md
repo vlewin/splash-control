@@ -142,7 +142,7 @@ Settings views follow standard macOS preference layout:
   strictly for invalid values or port collisions. Never use loud green checkmarks
   for standard valid inputs.
 - **Inline placeholders**: Unset values display their computed default via inline
-  placeholders (`Auto (58G)`, `10m (Default)`, `0 (Off)`, `9000`).
+  placeholders (`Auto (58G)`, `10m (Default)`, `0 (Off)`, `8000`).
 - **No vertical scrolling in sub-tabs**: Each sub-tab must fit fully within the
   standard window height (~380–540 pt) without vertical scrollbars.
 

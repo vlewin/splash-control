@@ -700,7 +700,7 @@ final class SplashProcess: ObservableObject {
   }
 
   private nonisolated static func listenerPids(port: Int) -> [pid_t]? {
-    // Note: the port needs a colon (`-i :9000`). A bare number makes lsof
+    // Note: the port needs a colon (`-i :8000`). A bare number makes lsof
     // fail with "unknown protocol name" and print nothing.
     guard let output = runTool("/usr/sbin/lsof", ["-nP", "-i", ":\(port)", "-t", "-sTCP:LISTEN"])
     else {
