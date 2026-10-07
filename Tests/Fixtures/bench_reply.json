@@ -1,0 +1,31 @@
+{
+  "usage": {
+    "prompt_tokens": 59,
+    "completion_tokens": 66,
+    "total_tokens": 125,
+    "prompt_tokens_details": {
+      "cached_tokens": 32
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 51
+    }
+  },
+  "timings": {
+    "prompt_n": 59,
+    "prompt_ms": 496.656,
+    "prompt_per_second": 54.36358364743404,
+    "predicted_n": 66,
+    "predicted_ms": 7607.064,
+    "predicted_per_second": 7.755948944297037,
+    "cache_n": 32
+  },
+  "choices": [
+    {
+      "finish_reason": "stop",
+      "message": {
+        "content": "\n\n1. pytest\n2. unittest\n3. nose2",
+        "reasoning_content": "We need to respond to user: \"List exactly 3 Python testing libraries. Number them 1-3. No extra text.\" Need final only numbered list. Ensure exactly 3 lines? \"1. pytest\" etc. No extra text.\n"
+      }
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+SplashControl
+Copyright 2026 Vlad Lewin
+
+Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+Attribution
+-----------
+
+SplashControl does not bundle the Splash runtime. It requires a separately
+installed Splash server and talks to it over its local HTTP API.
+
+Splash — the high-performance local LLM inference engine this app
+supervises — is developed by IncoAI (https://github.com/incoai) and is
+available at https://github.com/incoai/splash under the Apache License,
+Version 2.0.

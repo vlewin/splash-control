@@ -1,0 +1,31 @@
+name: Pull Request Checks
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  linux-tests:
+    name: Swift Testing (Linux)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Install Swift toolchain
+        uses: swift-actions/setup-swift@v2
+        with:
+          swift-version: "6.4"
+
+      # Basic checks only: the kit is Foundation-only, so the DTO suite builds
+      # and runs on Linux. App target, check scripts (pmset) and the release
+      # bundle stay macOS-only (release.yml, macos-26).
+      - name: Run Swift Testing suite
+        run: |
+          swift --version
+          swift test

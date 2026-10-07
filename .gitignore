@@ -1,0 +1,31 @@
+.build/
+dist/
+*.log
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Xcode / SPM
+.swiftpm/
+xcuserdata/
+*.xcuserstate
+DerivedData/
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Unfiled upstream issue drafts: local working material, not repo content.
+issues/
+
+# Compiled on demand by screenshot.sh from find-window-id.swift. Committing
+# the binary would break the cross-architecture portability it exists for.
+Scripts/find-window-id
+
+# Local environment & secrets
+.env*
+*.local
+*.pem
+*.key

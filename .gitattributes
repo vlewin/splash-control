@@ -1,0 +1,9 @@
+# Line endings: developed on macOS; Scripts/ runs under bash, whose
+# shebangs break on CRLF. Force LF so any contributor's checkout works.
+* text=auto eol=lf
+
+# GitHub tarball: keep it lean (releases ship a zipped dist/Splash.app).
+.codegraph export-ignore
+.github export-ignore
+.gitignore export-ignore
+.gitattributes export-ignore
