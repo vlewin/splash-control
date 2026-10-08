@@ -42,9 +42,15 @@ only with explicit user approval.
 7. **Regression test first** — scoped honestly by layer:
    - kit/DTO layer (`SplashControlKit`) → a real Swift Testing test in
      `Tests/SplashControlKitTests/`.
-   - view/app layer (no test runner exists) → a static lint pin in the check scripts
-     (`Scripts/check_core.sh` carries `lint:` greps) and/or a screenshot assertion.
-   - Never fabricate a view test runner, never weaken a gate to make a fix pass.
+   - app logic layer (`SplashControl`, macOS-gated) → a real Swift Testing test in
+     `Tests/SplashControlTests/`. SPM 5.5+ lets a test target depend on an
+     executable target; symbols in `main.swift` itself are still invisible to
+     tests (everything in other files is reachable via `@testable import`).
+   - layout/rendering shape a unit test cannot reach → a static lint pin in the
+     check scripts (`Scripts/check_core.sh` carries `lint:` greps) and/or a
+     screenshot assertion.
+   - Never fabricate a runner for a layer that has none, never weaken a gate to
+     make a fix pass.
 8. **Implement** — surgical, per AGENTS.md.
 9. **Gates, in order:** `make verify` → `make app` (from a clean tree) → quit the
    running copy → relaunch `dist/Splash.app` → confirm the live process path is the

@@ -150,18 +150,21 @@ No transient checklist file is kept in this repo. Session state lives in git his
 ## 11. Verifying your work
 
 The **DTO mirror** (`StatusDTO`, `SplashClient` completion types) is covered
-by a Swift Testing target (`make test`). It needs a toolchain with the
-`Testing` module: CLT ships none, so the Makefile defaults to Homebrew Swift
-(`SWIFT_TOOLCHAIN=…` overrides). The **view layer** has no runner (CLT has
-no `xctest`, `XCUITest` needs Xcode, zero SPM deps is a hard rule) and is
-defended by **construction plus static lints**.
+by a Swift Testing target (`make test`), as is the **app logic**
+(`SplashConfig` and friends, via the macOS-gated `SplashControlTests`
+target — SPM 5.5+ lets test targets depend on executable targets). Both need
+a toolchain with the `Testing` module: CLT ships none, so the Makefile
+defaults to Homebrew Swift (`SWIFT_TOOLCHAIN=…` overrides). The **rendering
+layer** still has no runner (CLT has no `xctest`, `XCUITest` needs Xcode,
+zero SPM deps is a hard rule) and is defended by **construction plus static
+lints**.
 
 ### Checks
 
 ```bash
 make build    # fast inner loop
 make check    # script suites (core + agent-status)
-make test     # swift-testing suite (DTO mirror)
+make test     # swift-testing suite (DTO mirror + app logic)
 make lint     # formatter gate (strict, zero warnings)
 make verify   # all hard gates: check + test + lint, every one green
 make app      # assemble dist/Splash.app
