@@ -117,19 +117,20 @@ When running CLI commands via bash/zsh, use **Rust Token Killer (`rtk`)** to min
 ## 9. Project Learnings & Self-improvement loop
 This section accumulates concrete corrections. When corrected on your approach, append a concrete one-line rule below ("Always use X for Y", not "be careful with Y"). If an existing rule covers it, tighten it.
 
-- *Learnings log*: (Empty — agent appends here upon user correction.)
+- *Learnings log*:
+  - Never commit or push without explicit user approval — stage, show the diff and proposed message, wait for confirmation.
 - *Rotation / prune test*: keep this log to ≤ 10 entries (fold durable rules into their section when it exceeds); every few weeks, delete any line whose removal would cause no mistake.
 - *Size budget*: ≤ ~320 lines / ≤ 20 KB — 2026 guidance (vLLM caps at 200/300 lines, Codex truncates at 32 KiB). New detail goes to a reference doc, not here.
 
 ## 10. Project context & Invariant constraints
 
 ### System boundary
-Splash Control (`SplashControl`) is a macOS menu-bar app that starts, monitors, and controls a running `splash` LLM server. It polls `GET /status` on `127.0.0.1:9000` and renders six tabs (**Live, Metrics, Statistics, Logs, Settings, Info**).
+Splash Control (`SplashControl`) is a macOS menu-bar app that starts, monitors, and controls a running `splash` LLM server. It polls `GET /status` on `127.0.0.1:8000` and renders six tabs (**Live, Metrics, Statistics, Logs, Settings, Info**).
 
 There is **no backend of our own.** The runtime lives in a separate repository (`incoai/splash`) — never edit it from here. Upstream findings go in the report, tagged *upstream*.
 
 ### Locked stack
-- **Language**: Swift, `swift-tools-version:5.10`, app target `SplashControl` + `SplashControlKit` DTO library (hosts the test target; SPM forbids test→executable deps).
+- **Language**: Swift, `swift-tools-version:5.10`, app target `SplashControl` + `SplashControlKit` DTO library (hosts the test target; SPM 5.5+ allows test→executable deps, so the kit exists to keep tests cross-platform while the app stays macOS-gated).
 - **Platform floor**: `Package.swift` declares `.macOS("26.4")`, mirroring the runtime's floor (splash 1.2.x requires **Apple M3+ / macOS 26.4+** — installed release 1.2.1, verified 2026-10-07). Keep `Resources/Info.plist`'s `LSMinimumSystemVersion` in agreement.
 - **UI**: SwiftUI + AppKit menu-bar integration (`TrayController`).
 - **Zero external SPM dependencies.** `Package.swift` has none; adding one needs a tradeoff analysis and explicit approval (see §15).
@@ -149,18 +150,21 @@ No transient checklist file is kept in this repo. Session state lives in git his
 ## 11. Verifying your work
 
 The **DTO mirror** (`StatusDTO`, `SplashClient` completion types) is covered
-by a Swift Testing target (`make test`). It needs a toolchain with the
-`Testing` module: CLT ships none, so the Makefile defaults to Homebrew Swift
-(`SWIFT_TOOLCHAIN=…` overrides). The **view layer** has no runner (CLT has
-no `xctest`, `XCUITest` needs Xcode, zero SPM deps is a hard rule) and is
-defended by **construction plus static lints**.
+by a Swift Testing target (`make test`), as is the **app logic**
+(`SplashConfig` and friends, via the macOS-gated `SplashControlTests`
+target — SPM 5.5+ lets test targets depend on executable targets). Both need
+a toolchain with the `Testing` module: CLT ships none, so the Makefile
+defaults to Homebrew Swift (`SWIFT_TOOLCHAIN=…` overrides). The **rendering
+layer** still has no runner (CLT has no `xctest`, `XCUITest` needs Xcode,
+zero SPM deps is a hard rule) and is defended by **construction plus static
+lints**.
 
 ### Checks
 
 ```bash
 make build    # fast inner loop
 make check    # script suites (core + agent-status)
-make test     # swift-testing suite (DTO mirror)
+make test     # swift-testing suite (DTO mirror + app logic)
 make lint     # formatter gate (strict, zero warnings)
 make verify   # all hard gates: check + test + lint, every one green
 make app      # assemble dist/Splash.app
@@ -225,7 +229,7 @@ copy the mistake forward.
 1. **This file & [ARCHITECTURE.md](ARCHITECTURE.md)** — process, conventions, and runtime contract.
 2. **[DESIGN.md](DESIGN.md)** — design system tokens, colors, typography, and optical alignment.
 3. **The live server** — for anything about schema or behaviour, probe it:
-   `curl -s http://127.0.0.1:9000/status`. For schema facts this outranks what
+   `curl -s http://127.0.0.1:8000/status`. For schema facts this outranks what
    any file says, including ARCHITECTURE.md § 4: docs go stale, the server does not.
 4. **`incoai/splash` source** — read the code, don't guess. A local checkout is
    a moving target; pin it against the installed release before trusting it.
@@ -253,7 +257,7 @@ Reply with these eight sections, in this order. Do not reorder or omit:
 1. **Files read** — each file touched + one line of its pre-edit state.
 2. **Plan** — the plan written before implementing.
 3. **Changes** — file-by-file: what changed and why.
-4. **Verification** — `swift build`; check scripts; runtime probe (live `:9000` server, or `Scripts/sample_status.py` if unavailable — say which); UI check with the `dist/Splash.app` bundle path; stale/nil handling only if touching `StatusDTO`/polling. Cite evidence per claim; for behaviour, state the observation method — unobserved behaviour is ⚠️ with the reason stated. Source-only confirmation is inference, not verification.
+4. **Verification** — `swift build`; check scripts; runtime probe (live `:8000` server, or `Scripts/sample_status.py` if unavailable — say which); UI check with the `dist/Splash.app` bundle path; stale/nil handling only if touching `StatusDTO`/polling. Cite evidence per claim; for behaviour, state the observation method — unobserved behaviour is ⚠️ with the reason stated. Source-only confirmation is inference, not verification.
 5. **Acceptance criteria** — each: ✅ (machine-checked) / ⚠️ (reasoned but unobserved) / ❌, with evidence.
 6. **Deviations from AGENTS.md** — anything done differently and why. "None" is valid. A skipped required step counts as a deviation — declare it here, never as "not needed" elsewhere.
 7. **New issues / incidental cleanups** — unrelated touch-ups with file paths, never silent.

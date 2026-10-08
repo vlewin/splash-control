@@ -4,7 +4,7 @@ import Foundation
 /// Persisted user configuration (~/Library/Application Support/SplashControl/splash-control-config.json).
 struct SplashConfig: Codable, Equatable {
   var model: String = "incoai/Qwen3.8-27B-Splash"
-  var port: Int = 9000
+  var port: Int = 8000  // splash's own default; matches a vanilla `splash serve`
   /// e.g. "28G" — passed to `splash serve --max-memory`; nil = auto
   var maxMemory: String? = "58G"  // this Mac: auto would resolve to 58G anyway
   /// e.g. "100K" — passed to `splash serve --max-context`; nil = auto

@@ -42,10 +42,6 @@ jobs:
           commit_analyzer_preset: "angular"
           default_bump: "patch"
           release_branches: "main"
-          # One-shot maiden-release pin: exact v0.9.0 with assets, pipeline-proven.
-          # (The action prepends its "v" prefix — pin the bare version.)
-          # Remove after the 0.9.0 run goes green (follow-up carries [skip-release]).
-          custom_tag: "0.9.0"
 
       - name: Build Release Bundle
         if: ${{ steps.tag_version.outputs.new_tag }}

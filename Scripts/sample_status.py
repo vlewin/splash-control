@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Sample http://127.0.0.1:9000/status once per second for 60 s.
+"""Sample http://127.0.0.1:8000/status once per second for 60 s.
 
 Writes one JSON object per line to the output file:
   {"t": <epoch ms>, "ok": true,  "status": {...}}
@@ -10,7 +10,7 @@ import sys
 import time
 import urllib.request
 
-URL = "http://127.0.0.1:9000/status"
+URL = "http://127.0.0.1:8000/status"
 OUT = sys.argv[1] if len(sys.argv) > 1 else "/tmp/splash-status-samples.jsonl"
 DURATION = int(sys.argv[2]) if len(sys.argv) > 2 else 60
 INTERVAL = 1.0

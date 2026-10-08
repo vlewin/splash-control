@@ -306,7 +306,7 @@ struct SettingsView: View {
           help:
             "The port splash serve listens on. It is also this app's base URL, and the port the tray polls."
         ) {
-          TextField("9000", value: $config.config.port, format: .number.grouping(.never))
+          TextField("8000", value: $config.config.port, format: .number.grouping(.never))
             .textFieldStyle(.roundedBorder)
             .frame(width: 140, alignment: .trailing)
         }

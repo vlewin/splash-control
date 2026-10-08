@@ -6,7 +6,7 @@ Technical architecture, runtime contract, and system integration for Splash Cont
 
 ## 1. System boundary & Architecture overview
 
-Splash Control is a macOS menu-bar app (SwiftUI + AppKit) that starts, monitors, and controls a running `splash` LLM server. It resolves the `splash` binary (config override → `/opt/homebrew/bin/splash` → `/usr/local/bin/splash` → `PATH`), spawns `splash serve`, polls `GET /status` on `127.0.0.1:9000`, and renders six tabs:
+Splash Control is a macOS menu-bar app (SwiftUI + AppKit) that starts, monitors, and controls a running `splash` LLM server. It resolves the `splash` binary (config override → `/opt/homebrew/bin/splash` → `/usr/local/bin/splash` → `PATH`), spawns `splash serve`, polls `GET /status` on `127.0.0.1:8000`, and renders six tabs:
 **Live, Metrics, Statistics, Logs, Settings, Info** (benchmark UI lives inside Statistics).
 
 There is **no backend of our own.** The splash server is the system under observation; this app only reads it. The runtime lives in a separate repository (`incoai/splash`).
@@ -15,7 +15,7 @@ There is **no backend of our own.** The splash server is the system under observ
 
 ## 2. Locked stack & Invariants
 
-- **Language**: Swift, `swift-tools-version:5.10`, a `SplashControl` executable target, a small `SplashControlKit` DTO library (`StatusDTO`, `SplashClient` — SPM forbids test targets from depending on executables), and a `SplashControlKitTests` target.
+- **Language**: Swift, `swift-tools-version:5.10`, a `SplashControl` executable target, a small `SplashControlKit` DTO library (`StatusDTO`, `SplashClient` — kept as a library so the tests stay cross-platform; SPM 5.5+ allows test targets to depend on executable targets), a `SplashControlKitTests` target, and a macOS-gated `SplashControlTests` target for the app's logic.
 - **Platform floor**: `Package.swift` declares `.macOS("26.4")`, mirroring the runtime's floor (splash 1.2.x requires **Apple M3+ / macOS 26.4+**). `Resources/Info.plist`'s `LSMinimumSystemVersion` must match.
 - **UI**: SwiftUI + AppKit menu-bar integration (`TrayController`).
 - **Zero external SPM dependencies**: `Package.swift` has none and none get added.
