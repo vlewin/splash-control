@@ -39,7 +39,10 @@ jobs:
         uses: mathieudutour/github-tag-action@v7
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          commit_analyzer_preset: "angular"
+          # Not "angular": v7 bundles conventional-changelog-angular 5, whose
+          # header pattern cannot parse "type!:" — breaking commits degrade
+          # to default_bump (this is how 0.9.1 got cut instead of 1.0.0).
+          commit_analyzer_preset: "conventionalcommits"
           default_bump: "patch"
           release_branches: "main"
 
