@@ -84,6 +84,7 @@ When running CLI commands via bash/zsh, use **Rust Token Killer (`rtk`)** to min
 
 - **"Does X exist?" → exact-match Grep tool, or `rg` WITHOUT the `rtk` wrapper.** Never conclude absence from `rtk rg` output.
 - `rtk rg` is fine for *finding candidate sites*, where you verify each hit.
+- Precedence: the existence-check rule beats the use-`rtk` rule. `gh`/`brew` existence and small-listing output always runs raw.
 
 ### 5.3 Verification principles
 - Prefer running the code to guessing about the code. If a test suite exists, run it. If a linter exists, run it.
@@ -243,7 +244,8 @@ the current macOS/SwiftUI API surface:
 1. `context7` MCP first (`resolve-library-id`, then `query-docs`).
 2. Then web search against official sources.
 3. If both come up empty, say so and mark the claim unverified. Never present a
-   remembered fact as if it had been checked.
+   remembered fact as if it had been checked. For CLI surface (`gh`, `brew`),
+   check `gh <cmd> --help` before assuming a subcommand exists.
 
 ## 13. Reference docs — when to read them
 
@@ -251,6 +253,8 @@ the current macOS/SwiftUI API surface:
 - **[DESIGN.md](DESIGN.md)** — read before touching any SwiftUI view or verifying a UI change. Design tokens (§ 1–2), layout safety (§ 2.11), heights (§ 2.9), bar charts (§ 2.7), screenshots (§ 4).
 
 ## 14. Report format
+
+Precedence: §14 governs task-report shape; ponytail governs diff size only.
 
 Reply with these eight sections, in this order. Do not reorder or omit:
 
