@@ -62,7 +62,7 @@ For every task:
 1. State the success criteria before writing code.
 2. Write the verification (test, script, benchmark, screenshot diff) where practical.
 3. Run the verification. Read the output. Do not claim success without checking.
-4. If the verification fails, fix the cause, not the test.
+4. If the verification fails, fix the cause, not the test — within §6's stop bound (two failed corrections, then stop and report).
 
 ## 5. Tool use, CodeGraph, and verification
 
@@ -73,7 +73,7 @@ Do not maintain manual file trees in documentation — use **CodeGraph** (`.code
   1. `codegraph_explore` or `search_graph` — explore areas, find classes, methods, and call paths in one shot.
   2. `codegraph_node` or `trace_path` — inspect a symbol's implementation and its callers/callees.
   3. `get_code_snippet` — inspect targeted function or struct definitions.
-  4. Fall back to grep / file searches only for string literals, shell scripts, config keys, or non-code assets.
+  4. Fall back to grep / file searches only for string literals, shell scripts, config keys, or non-code assets (line 71 covers code symbols and call paths only).
 - **CLI fallback**: `codegraph <query|explore|node|callers|callees|impact> <symbol>` for symbol work; `codegraph status` / `codegraph sync` for index health.
 
 ### 5.2 Rust Token Killer (`rtk`) usage and exceptions
@@ -84,6 +84,7 @@ When running CLI commands via bash/zsh, use **Rust Token Killer (`rtk`)** to min
 
 - **"Does X exist?" → exact-match Grep tool, or `rg` WITHOUT the `rtk` wrapper.** Never conclude absence from `rtk rg` output.
 - `rtk rg` is fine for *finding candidate sites*, where you verify each hit.
+- Precedence: the existence-check rule beats both the use-`rtk` rule and the §5.1 graph-tools rule — symbol-existence questions go to exact-match Grep (raw `rg`), never CodeGraph or `rtk`. `gh`/`brew` existence and small-listing output always runs raw.
 
 ### 5.3 Verification principles
 - Prefer running the code to guessing about the code. If a test suite exists, run it. If a linter exists, run it.
@@ -134,7 +135,7 @@ There is **no backend of our own.** The runtime lives in a separate repository (
 - **Platform floor**: `Package.swift` declares `.macOS("26.4")`, mirroring the runtime's floor (splash 1.2.x requires **Apple M3+ / macOS 26.4+** — installed release 1.2.1, verified 2026-10-07). Keep `Resources/Info.plist`'s `LSMinimumSystemVersion` in agreement.
 - **UI**: SwiftUI + AppKit menu-bar integration (`TrayController`).
 - **Zero external SPM dependencies.** `Package.swift` has none; adding one needs a tradeoff analysis and explicit approval (see §15).
-- **Build**: `make build` (inner loop) · `make verify` (all hard gates) · `make app` (assembles `dist/Splash.app`, ad-hoc signed) · `make check` (script suites) · `make test` (DTO suite). Targets delegate to `Scripts/`; the Makefile holds no logic.
+- **Build**: `make build` (inner loop) · `make verify` (all hard gates) · `make app` (assembles `dist/Splash.app`, ad-hoc signed) · `make check` (script suites) · `make test` (DTO mirror + app logic). Targets delegate to `Scripts/`; the Makefile holds no logic.
 
 ### Core invariants & house rules
 - `StatusDTO` is a **mirror of the server schema**, not our domain model. Conversions happen in `StatsModel`/views.
@@ -243,7 +244,8 @@ the current macOS/SwiftUI API surface:
 1. `context7` MCP first (`resolve-library-id`, then `query-docs`).
 2. Then web search against official sources.
 3. If both come up empty, say so and mark the claim unverified. Never present a
-   remembered fact as if it had been checked.
+   remembered fact as if it had been checked. For CLI surface (`gh`, `brew`),
+   check `gh <cmd> --help` before assuming a subcommand exists.
 
 ## 13. Reference docs — when to read them
 
@@ -251,6 +253,8 @@ the current macOS/SwiftUI API surface:
 - **[DESIGN.md](DESIGN.md)** — read before touching any SwiftUI view or verifying a UI change. Design tokens (§ 1–2), layout safety (§ 2.11), heights (§ 2.9), bar charts (§ 2.7), screenshots (§ 4).
 
 ## 14. Report format
+
+Precedence: §14 governs task-report shape; ponytail governs diff size only.
 
 Reply with these eight sections, in this order. Do not reorder or omit:
 
@@ -272,7 +276,7 @@ Reply with these eight sections, in this order. Do not reorder or omit:
 - Do not claim success from `swift build` alone — assemble, relaunch, observe.
 - Do not leave changes uncommitted upon completing a task.
 - Do not commit or merge unless `make verify` is green — check, test, lint, no exceptions.
-- Do not commit on `main` — feature branches + PR; the agent may push its branch for review but only a human merges to `main`. Direct or force-push to `main` needs explicit approval.
+- Do not commit on `main` — feature branches + PR; the agent may push its branch for review only with explicit user approval, and only a human merges to `main`. Direct or force-push to `main` needs explicit approval.
 - Do not report a change as visible until `dist/Splash.app` is rebuilt **and** relaunched.
 - Do not parse `splash serve` console lines for data `/status` provides.
 - Do not put a sampling flag in `extraArgs` — it crash-loops the server.
