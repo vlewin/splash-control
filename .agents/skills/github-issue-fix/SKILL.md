@@ -79,7 +79,11 @@ only with explicit user approval.
     - patch/minor → never touch the plist (it moves on release only).
 12. **PR.** Description: issue link, root cause, verification evidence (test name /
     screenshot / live probe), gate results, expected release class. End with
-    `Fixes #N` so the issue auto-closes. Push the branch, report the URL.
+    `Fixes #N` so the issue auto-closes. Evidence is text in the body — gate
+    output, probe values, screenshot observations (what was inspected, what it
+    shows). Never commit PNGs. Uploading the image into the PR body is the
+    human's step at review, not the agent's; never block on it. Push the
+    branch, report the URL.
 13. **STOP.** Hand to the human: "ready to merge; expect release <class>".
 14. **Post-merge.** Check the run: tag minted as expected, release has zip + sha256,
     changelog reads right. Then `git fetch --prune` and fetch tags carefully —
