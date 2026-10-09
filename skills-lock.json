@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "skills": {
+    "swift-patterns": {
+      "source": "efremidze/swift-patterns-skill",
+      "sourceType": "github",
+      "skillPath": "swift-patterns/SKILL.md",
+      "computedHash": "b2d36591ff75abc54f06554a8ed3bb742af71b559eb8f5f913e2ef9a89ebd8b2"
+    },
+    "swiftui-performance-audit": {
+      "source": "Dimillian/Skills",
+      "sourceType": "github",
+      "skillPath": "swiftui-performance-audit/SKILL.md",
+      "computedHash": "4c153a7401d4d878fad3b7b83ca3d29f43245f8404dd34b7beb400cdfcab46f7"
+    }
+  }
+}
