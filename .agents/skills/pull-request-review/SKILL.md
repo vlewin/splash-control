@@ -33,7 +33,8 @@ Gates (in order):
   `dist/Splash.app` → live process path resolves inside the dist bundle.
   Evidence must be local; CI output alone does not satisfy this gate. When the
   PR ships no app bytes, cite the byte-free diff and mark the gate N/A.
-- Screenshot per touched view, inspected, attached to the PR (not committed).
+- Screenshot per touched view, inspected, described in the PR body and attached
+  to the PR by the human at review (never committed).
   When no view changed, state that explicitly instead of attaching a screenshot.
   For process-only changes, cite `git diff --stat` and `git diff --check` as
   the byte-free evidence.

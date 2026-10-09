@@ -32,7 +32,11 @@ only with explicit user approval.
    user's configured port; check the config, do not assume); `Tests/Fixtures/` and
    `Scripts/sample_status.py` when the server is unavailable. Say which source you
    used in the final report. Wrap CLI/server probes in `rtk`; run existence
-   checks raw (AGENTS.md §5.2).
+   checks raw (AGENTS.md §5.2). `process.splashVersion` is the installed binary,
+   never the adopted server's: a version-range check is sound only for a server
+   the app spawned itself; an adopted server exposes no version anywhere
+   (`/status`, `/metrics`, `/version`), and `schema_version` can't substitute —
+   1.2.x and 1.3.0 both serve schema 6.
 4. **Triage.** If the defect belongs upstream in `incoai/splash`, stop and report
    *upstream*. Do not work around upstream behavior in this repo.
 5. **Plan** (per AGENTS.md § 1, before any edit): an interpretation check
@@ -75,7 +79,11 @@ only with explicit user approval.
     - patch/minor → never touch the plist (it moves on release only).
 12. **PR.** Description: issue link, root cause, verification evidence (test name /
     screenshot / live probe), gate results, expected release class. End with
-    `Fixes #N` so the issue auto-closes. Push the branch, report the URL.
+    `Fixes #N` so the issue auto-closes. Evidence is text in the body — gate
+    output, probe values, screenshot observations (what was inspected, what it
+    shows). Never commit PNGs. Uploading the image into the PR body is the
+    human's step at review, not the agent's; never block on it. Push the
+    branch, report the URL.
 13. **STOP.** Hand to the human: "ready to merge; expect release <class>".
 14. **Post-merge.** Check the run: tag minted as expected, release has zip + sha256,
     changelog reads right. Then `git fetch --prune` and fetch tags carefully —

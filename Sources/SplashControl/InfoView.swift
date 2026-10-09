@@ -22,6 +22,15 @@ struct InfoView: View {
   @ObservedObject var process: SplashProcess
   @ObservedObject var stats: StatsModel
 
+  /// Tested-against splash range ("supported" = releases this app renders
+  /// fully). Floor 1.2.0 = status schema 6, the DTO's model; max 1.2.1 = the
+  /// installed release on the live server here. 1.3.0 is untested, so it is
+  /// excluded (its status schema is still 6; 8 is its native wire protocol,
+  /// which this app never speaks). Keep in sync with ARCHITECTURE.md § 4.1;
+  /// the agent that re-verifies against a new splash release updates both in
+  /// the same PR.
+  static let supportedSplash = "1.2.0 – 1.2.1"
+
   var body: some View {
     ScrollView {
       VStack(spacing: 12) {
@@ -73,6 +82,7 @@ struct InfoView: View {
         // One column, no right wing: a right-aligned value next to a long
         // endpoint read as two unrelated facts sharing a row.
         info("Inference engine", "Splash \(process.splashVersion ?? "—")")
+        info("Engine support", "splash \(Self.supportedSplash)")
         info("API endpoint", process.endpointURL)
         info("Models", "\(ModelCatalog.installed().count) installed")
 
