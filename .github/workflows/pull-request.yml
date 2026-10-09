@@ -18,11 +18,16 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Install Swift toolchain
-        uses: swift-actions/setup-swift@v2
+        uses: SwiftyLab/setup-swift@v1.14.1
         with:
-          # setup-swift@v2 keeps a hardcoded version list that tops out at
-          # 6.2.1 — newer releases (6.3/6.4) are unknown to it and fail at
-          # install time. 6.2.1 ships the Testing module, which the suite needs.
+          # swift-actions/setup-swift (v2 and v3 alike) is dormant and
+          # declares node20; Node 20 was removed from GitHub-hosted runners
+          # on 2026-09-23, so GitHub forced it onto Node 24 and printed a
+          # deprecation warning on every PR run. SwiftyLab/setup-swift is
+          # the maintained successor (node24, same swift-version contract).
+          # Pinned to an exact tag: version resolution uses the toolchain
+          # snapshot the action was built with, so the tag is part of what
+          # is verified. 6.2.1 ships the Testing module, which the suite needs.
           swift-version: "6.2.1"
 
       # Basic checks only: the kit is Foundation-only, so the DTO suite builds
