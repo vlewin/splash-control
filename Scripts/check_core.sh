@@ -290,13 +290,16 @@ if let raw = try? String(contentsOfFile: "Tests/Fixtures/status_schema6.json", e
     func declaredKeys(_ section: String) -> Set<String> {
         let paths = ["kv": ["kv"], "state": ["state"], "cache": ["cache"],
                      "disk": ["disk"], "memory_actual": ["memoryActual"],
-                     "memory_governor": ["memoryGovernor"]]
+                     "memory_governor": ["memoryGovernor"],
+                     "admission": ["admission"]]
         let path = paths[section]?[0] ?? section
         let value: Any? = Mirror(reflecting: full).children
             .first { $0.label == path }?.value
-        guard let dict = value as? StatusDTO,
-              let anyEncodable = dict as? any Encodable else { return [] }
-        let data = (try? JSONEncoder().encode(AnyEncodable(anyEncodable))) ?? Data()
+        // The child is the section struct (KV?, MemoryActual?, ...), never a
+        // StatusDTO: casting to StatusDTO can never succeed and silently
+        // returned [] for every section (the vacuous-lint bug, #16).
+        guard let encodable = value as? any Encodable else { return [] }
+        let data = (try? JSONEncoder().encode(AnyEncodable(encodable))) ?? Data()
         let object = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] ?? [:]
         return Set(object.keys)
     }
@@ -306,7 +309,7 @@ if let raw = try? String(contentsOfFile: "Tests/Fixtures/status_schema6.json", e
         func encode(to encoder: Encoder) throws { try encodeClosure(encoder) }
     }
 
-    for section in ["kv", "state", "cache", "disk", "memory_actual", "memory_governor"] {
+    for section in ["kv", "state", "cache", "disk", "memory_actual", "memory_governor", "admission"] {
         // Only the phantom direction is a bug. A server key this DTO does not
         // model is the deliberate-subset case the file doc comment describes, so
         // demanding full coverage would force ~35 fields nobody reads.
