@@ -4,6 +4,7 @@ The working contract for humans and AI agents changing this repository. Read it
 in full before writing code. It is the only file you must read *at session
 start*. When a task touches the runtime, the UI, or screenshots, § 13 says
 which reference doc to open.
+Local override: session start requires this file plus §13-gated ARCHITECTURE.md/DESIGN.md reads; "only file" means only AGENTS.md, not only source.
 
 If a task prompt conflicts with this file, **stop and report the conflict**
 before proceeding. Do not silently pick a side.
@@ -23,7 +24,7 @@ These rules override everything else in this file when in conflict:
 **Goal: understand the problem and the codebase before producing a diff.**
 
 - State your plan in one or two sentences before editing. For anything non-trivial, produce a numbered list of steps with a verification check for each.
-- Read the files you will touch. Read the files that call the files you will touch. Use CodeGraph (tool priority in § 5.1) or subagents for exploration so the main context stays clean.
+- Read the files you will touch. Read the files that call the files you will touch. Use CodeGraph (§5.1) or subagents for exploration so the main context stays clean.
 - Match existing patterns in the codebase. If the project uses pattern X, use pattern X, even if you'd do it differently in a greenfield repo.
 - Surface assumptions out loud: "I'm assuming you want X, Y, Z. If that's wrong, say so." Do not bury assumptions inside the implementation.
 - If two approaches exist, present both with tradeoffs. Do not pick one silently. Exception: trivial tasks (typo, rename, log line) where the diff fits in one sentence.
@@ -67,15 +68,7 @@ For every task:
 ## 5. Tool use, CodeGraph, and verification
 
 ### 5.1 Codebase discovery with CodeGraph
-Do not maintain manual file trees in documentation — use **CodeGraph** (`.codegraph/` SQLite index & MCP server).
-- **Always prefer graph tools over raw grep/find for code discovery.**
-- **Tool priority**:
-  1. `codegraph_explore` or `search_graph` — explore areas, find classes, methods, and call paths in one shot.
-  2. `codegraph_node` or `trace_path` — inspect a symbol's implementation and its callers/callees.
-  3. `get_code_snippet` — inspect targeted function or struct definitions.
-  4. Fall back to grep / file searches only for string literals, shell scripts, config keys, or non-code assets (line 71 covers code symbols and call paths only).
-- **CLI fallback**: `codegraph <query|explore|node|callers|callees|impact> <symbol>` for symbol work; `codegraph status` / `codegraph sync` for index health.
-- **Fallback requires an availability check first**: run `codegraph status` before falling back to grep/reads (stale → `codegraph sync`). An unchecked fallback is declared under §14 Deviations with impact.
+Local: same as global §7; project index is `.codegraph/` (refresh with `codegraph sync`, rebuild with `codegraph index`).
 
 ### 5.2 Rust Token Killer (`rtk`) usage and exceptions
 When running CLI commands via bash/zsh, use **Rust Token Killer (`rtk`)** to minimize token usage across outputs.
@@ -206,6 +199,8 @@ Read [DESIGN.md](DESIGN.md) before touching any SwiftUI view (which sections: §
 
 `check_core.sh` carries static `lint:` greps that pin these shapes. They run in milliseconds; run them.
 
+Local override: task is not complete until make verify green, dist/Splash.app rebuilt + relaunched, changes committed on a feature branch with explicit approval (§9); §14 8-section report shape binds.
+
 ### Commit on completion
 
 A task is not complete until `make verify` is green, `make-app.sh` has assembled the
@@ -224,6 +219,8 @@ inherits a diff it cannot date.
   first; the version bump closes it.
 
 ## 12. Sources of truth
+
+Local override: sources-of-truth ranking (§12 1–5) outranks global tool defaults for schema/behavior facts; live server probe wins.
 
 In priority order. If a lower source contradicts a higher one, flag it — do not
 copy the mistake forward.
