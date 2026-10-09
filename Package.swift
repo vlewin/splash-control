@@ -24,7 +24,7 @@ import PackageDescription
 
 let package = Package(
     name: "SplashControl",
-    // Platform floor matches splash 1.2.1 (macOS 26.4+, GPU family 9).
+    // Platform floor matches splash 1.3.0 (macOS 26.4+, GPU family 9).
     platforms: [.macOS("26.4")],
     targets: [
         // DTOs live in a small public library: the app is macOS-gated above,

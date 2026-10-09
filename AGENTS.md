@@ -126,7 +126,7 @@ There is **no backend of our own.** The runtime lives in a separate repository (
 
 ### Locked stack
 - **Language**: Swift, `swift-tools-version:5.10`, app target `SplashControl` + `SplashControlKit` DTO library (hosts the test target; SPM 5.5+ allows test→executable deps, so the kit exists to keep tests cross-platform while the app stays macOS-gated).
-- **Platform floor**: `Package.swift` declares `.macOS("26.4")`, mirroring the runtime's floor (splash 1.2.x requires **Apple M3+ / macOS 26.4+** — installed release 1.2.1, verified 2026-10-07). Keep `Resources/Info.plist`'s `LSMinimumSystemVersion` in agreement.
+- **Platform floor**: `Package.swift` declares `.macOS("26.4")`, mirroring the runtime's floor (splash requires **Apple M3+ / macOS 26.4+** — installed release 1.3.0, verified 2026-10-09). Keep `Resources/Info.plist`'s `LSMinimumSystemVersion` in agreement.
 - **UI**: SwiftUI + AppKit menu-bar integration (`TrayController`).
 - **Zero external SPM dependencies.** `Package.swift` has none; adding one needs a tradeoff analysis and explicit approval (see §15).
 - **Build**: `make build` (inner loop) · `make verify` (all hard gates) · `make app` (assembles `dist/Splash.app`, ad-hoc signed) · `make check` (script suites) · `make test` (DTO mirror + app logic). Targets delegate to `Scripts/`; the Makefile holds no logic.
