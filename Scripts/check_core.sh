@@ -115,6 +115,17 @@ INFO=Sources/SplashControl/InfoView.swift
 lint_check "Info declares the supported splash range" \
     "grep -q 'supportedSplash' '$INFO' && grep -q 'Engine support' '$INFO'"
 
+# 10. The context window is a picker with a hardware-aware row set (issue #8):
+#     a free-text field let a 128K default persist on a Mac whose own preset
+#     card says it cannot afford one. Pin the base row set, the 64 GiB gate
+#     on the 256K cap, and the Settings control being a Picker.
+lint_check "context rows keep the base 32/64/128K set" \
+    "grep -q '\"32K\", \"64K\", \"128K\"' Sources/SplashControl/Config.swift"
+lint_check "256K row is gated on 64 GiB of unified memory" \
+    "grep -q 'physicalGiB >= 64' Sources/SplashControl/Config.swift"
+lint_check "context row in Settings is a Picker, not a free-text field" \
+    "grep -A 14 '\"Context Window\"' Sources/SplashControl/SettingsView.swift | grep -q 'Picker('"
+
 if [ "$lint_failures" -ne 0 ]; then
     echo ""
     echo "$lint_failures layout safety lint(s) FAILED. Aborting."
@@ -719,7 +730,16 @@ MainActor.assumeIsolated { statsChecks() }
 
 // MARK: - SplashConfig tolerant decode
 let empty = try! JSONDecoder().decode(SplashConfig.self, from: Data("{}".utf8))
-check("config default maxContext", empty.maxContext, "128K")
+check("config default maxContext follows the host tier",
+      empty.maxContext, SplashConfig.defaultMaxContext(physicalGiB: HostMemory.physicalGiB))
+check("default context on a 24 GiB host is 64K", SplashConfig.defaultMaxContext(physicalGiB: 24), "64K")
+check("default context on a 64 GiB host is 128K", SplashConfig.defaultMaxContext(physicalGiB: 64), "128K")
+check("default context on an unknown host takes the small end",
+      SplashConfig.defaultMaxContext(physicalGiB: nil), "64K")
+checkEq("picker rows: the base set below the 256K gate", SplashConfig.contextChoices(physicalGiB: 48),
+        ["32K", "64K", "128K"])
+checkEq("a 64 GiB host gets the 256K cap row", SplashConfig.contextChoices(physicalGiB: 64),
+        ["32K", "64K", "128K", "256K"])
 checkNil("config default kvFormat nil (flag omitted)", empty.kvFormat)
 checkNil("config default maxCacheDisk nil (flag omitted)", empty.maxCacheDisk)
 

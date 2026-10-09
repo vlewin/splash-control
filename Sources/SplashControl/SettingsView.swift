@@ -28,7 +28,6 @@ struct SettingsView: View {
 
   // Effective server defaults, shown in inline placeholders.
   private let defMaxMemory = "58G"  // auto resolves to 58G on a 64 GiB Mac
-  private let defMaxContext = "128K"  // server context cap
   private let defMaxRequestSize = "128M"  // server default
 
   var body: some View {
@@ -343,25 +342,28 @@ struct SettingsView: View {
         let ctxWarning = ctxVerdict?.ok == false ? ctxVerdict?.text : nil
         let ctxSubtitle =
           ctxWarning == nil
-          ? (ctxVerdict?.text ?? "Maximum token limit per request · blank = auto (\(defMaxContext))")
+          ? (ctxVerdict?.text ?? "Maximum token limit per request · Auto = engine decides")
           : ""
         formRow(
           "Context Window", ctxSubtitle, warning: ctxWarning,
           help:
-            "The enforced context window. Keep it equal to what your client caps at, or a request is rejected before it reaches the engine."
+            "The enforced context window. Keep it equal to what your client caps at, or a request is rejected before it reaches the engine. Auto lets the engine decide; 256K, the server's cap, is offered only on hosts with 64 GiB or more of unified memory."
         ) {
-          TextField(
-            "Auto (\(defMaxContext))",
-            text: Binding(
+          Picker(
+            "",
+            selection: Binding(
               get: { config.config.maxContext ?? "" },
-              set: { val in
-                let trimmed = val.trimmingCharacters(in: .whitespaces)
-                config.config.maxContext = trimmed.isEmpty ? nil : trimmed
-              }
+              set: { config.config.maxContext = $0.isEmpty ? nil : $0 }
             )
-          )
-          .textFieldStyle(.roundedBorder)
-          .frame(width: 140, alignment: .trailing)
+          ) {
+            Text("Auto").tag("")
+            ForEach(contextWindowRows, id: \.self) { row in
+              Text(row == contextRecommendedTier ? "\(row) (Recommended)" : row).tag(row)
+            }
+          }
+          .pickerStyle(.menu)
+          .labelsHidden()
+          .frame(width: 190, alignment: .trailing)
         }
 
         // KV Cache Precision
@@ -745,6 +747,21 @@ struct SettingsView: View {
     if host > 0 { return host }
     return stats.latest?.memoryPlan?.device?.physicalMemoryBytes
       .map { Double($0) / 1_073_741_824 }
+  }
+
+  /// Picker rows for the context window: the choices the host can afford plus
+  /// whatever is configured, so a non-standard value stays selectable (the
+  /// `""` Auto row is always present, so the selection is always in range).
+  private var contextWindowRows: [String] {
+    var rows = SplashConfig.contextChoices(physicalGiB: HostMemory.physicalGiB)
+    let configured = config.config.maxContext ?? ""
+    if !rows.contains(configured) { rows.append(configured) }
+    return rows
+  }
+
+  /// The recommended preset's tier, so its row carries the badge.
+  private var contextRecommendedTier: String {
+    HardwarePreset.recommended(physicalGiB: HostMemory.physicalGiB).maxContext
   }
 
   private var activePresetName: String {

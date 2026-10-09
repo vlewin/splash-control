@@ -7,8 +7,10 @@ struct SplashConfig: Codable, Equatable {
   var port: Int = 8000  // splash's own default; matches a vanilla `splash serve`
   /// e.g. "28G" — passed to `splash serve --max-memory`; nil = auto
   var maxMemory: String? = "58G"  // this Mac: auto would resolve to 58G anyway
-  /// e.g. "100K" — passed to `splash serve --max-context`; nil = auto
-  var maxContext: String? = "128K"  // matches the pi agent cap
+  /// e.g. "100K" — passed to `splash serve --max-context`; nil = auto. A fresh
+  /// install takes the host's recommended tier, so the default agrees with the
+  /// preset card (issue #8).
+  var maxContext: String? = SplashConfig.defaultMaxContext(physicalGiB: HostMemory.physicalGiB)
   /// "int8" or "bf16" — `splash serve --kv-format`; nil = int8 (server default)
   var kvFormat: String? = nil
   /// e.g. "5G" — `splash serve --max-cache-disk` SSD tier; nil/0 = disabled
@@ -69,6 +71,23 @@ struct SplashConfig: Codable, Equatable {
   /// Ordered for the Settings menu; membership decides what buildLaunchArgs
   /// forwards and what the extraArgs migration accepts.
   static let reasoningEffortValues = ["none", "minimal", "low", "medium", "high", "xhigh", "max"]
+
+  /// The context windows a picker can offer. The base rows always exist;
+  /// 256K is the server's cap, so it is offered only where it fits — hosts
+  /// with 64 GiB of unified memory or more (issue #8). It stays opt-in:
+  /// the recommended tier is never above 128K.
+  static func contextChoices(physicalGiB: Double?) -> [String] {
+    var ids = ["32K", "64K", "128K"]
+    if let physicalGiB, physicalGiB >= 64 { ids.append("256K") }
+    return ids
+  }
+
+  /// A fresh install's context window: the recommended preset's tier, so a
+  /// small Mac is not handed a window its own preset card says it cannot
+  /// afford (issue #8).
+  static func defaultMaxContext(physicalGiB: Double?) -> String {
+    HardwarePreset.recommended(physicalGiB: physicalGiB).maxContext
+  }
 
   /// Pull a `--default-reasoning-effort <value>` pair out of a raw extraArgs
   /// string (both `--flag value` and `--flag=value` forms; last valid wins).
@@ -242,5 +261,15 @@ final class ConfigStore: ObservableObject {
     if let data = try? encoder.encode(config) {
       try? data.write(to: Self.configURL(), options: .atomic)
     }
+  }
+}
+
+/// Unified memory in GiB, read from `ProcessInfo`. `nil` when the host cannot
+/// be read: callers take the smallest documented tier, never a guess at a
+/// large one — the same fallback `HardwarePreset.recommended` applies.
+enum HostMemory {
+  static var physicalGiB: Double? {
+    let gib = Double(ProcessInfo.processInfo.physicalMemory) / 1_073_741_824
+    return gib > 0 ? gib : nil
   }
 }
