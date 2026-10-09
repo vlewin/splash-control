@@ -16,7 +16,8 @@ Gates: `make verify` (check + test + lint) · `make app` (assembles `dist/Splash
 Release pipeline: tag on `main` (minted by github-tag-action parsing conventional
 commits since the last tag) → release with bundle zip + sha256 + auto changelog.
 `feat!`/`fix!`/`!` = major · `feat` = minor · `fix` = patch · `[skip-release]` in the
-subject excludes a commit · empty commit set ⇒ no tag.
+subject excludes a commit · empty commit set ⇒ no tag · `docs:`/`chore:` alone
+mint nothing (`default_bump: "false"` in `release.yml`).
 
 Process: PR-based. A human merges. The agent pushes its branch only, never `main`, and
 only with explicit user approval.
@@ -26,10 +27,12 @@ only with explicit user approval.
 1. **Clean tree.** `git status --porcelain` must be empty before any work or build.
    If dirty, stop and ask.
 2. **Read the issue.** `gh issue view N` with labels. Fetch the full body.
+   Record labels + comment count; if comments exist, read them or state why not.
 3. **Reproduce.** Live server first (`curl -s http://127.0.0.1:9000/status` — the
    user's configured port; check the config, do not assume); `Tests/Fixtures/` and
    `Scripts/sample_status.py` when the server is unavailable. Say which source you
-   used in the final report.
+   used in the final report. Wrap CLI/server probes in `rtk`; run existence
+   checks raw (AGENTS.md §5.2).
 4. **Triage.** If the defect belongs upstream in `incoai/splash`, stop and report
    *upstream*. Do not work around upstream behavior in this repo.
 5. **Plan** (per AGENTS.md § 1, before any edit): an interpretation check
@@ -37,7 +40,10 @@ only with explicit user approval.
    tradeoff each, which gate will prove the fix (test name or screenshot), and a
    numbered edit list with a verification check per step. For non-trivial fixes,
    delegate to the superpowers `writing-plans` skill if it is installed; do not
-   duplicate its format here.
+   duplicate its format here. If the plan touches a SwiftUI view, cite the
+   DESIGN.md sections before Plan exits. If the task declares a static fact in
+   the UI, define what the fact means, who updates it on the next upstream
+   release, and where its single source of truth lives.
 6. **Branch** `fix/<slug>` (or `feat/<slug>`) off `main`.
 7. **Regression test first** — scoped honestly by layer:
    - kit/DTO layer (`SplashControlKit`) → a real Swift Testing test in

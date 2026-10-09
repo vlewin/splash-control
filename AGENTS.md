@@ -75,6 +75,7 @@ Do not maintain manual file trees in documentation — use **CodeGraph** (`.code
   3. `get_code_snippet` — inspect targeted function or struct definitions.
   4. Fall back to grep / file searches only for string literals, shell scripts, config keys, or non-code assets (line 71 covers code symbols and call paths only).
 - **CLI fallback**: `codegraph <query|explore|node|callers|callees|impact> <symbol>` for symbol work; `codegraph status` / `codegraph sync` for index health.
+- **Fallback requires an availability check first**: run `codegraph status` before falling back to grep/reads (stale → `codegraph sync`). An unchecked fallback is declared under §14 Deviations with impact.
 
 ### 5.2 Rust Token Killer (`rtk`) usage and exceptions
 When running CLI commands via bash/zsh, use **Rust Token Killer (`rtk`)** to minimize token usage across outputs.
