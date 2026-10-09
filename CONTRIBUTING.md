@@ -4,6 +4,7 @@ Read [AGENTS.md](AGENTS.md) before changing code. It is the working contract for
 
 - `make build`, `make check`, `make app` build, verify, and assemble `dist/Splash.app`.
 - One concern per commit, with a conventional prefix (`feat:`, `fix:`, `docs:`, `refactor:`, `chore:`, `style:`).
+- Docs-only pushes never release: the pipeline mints a tag only when a commit selects a bump (`feat`/`fix`/`perf`/breaking), so `docs:`/`chore:` ride the next shippable release's changelog.
 - No external SPM dependencies. Swift, single `SplashControl` target.
 - Bug reports, feature requests, and upstream findings go through the [issue forms](.github/ISSUE_TEMPLATE/). Blank issues are disabled.
 

@@ -43,7 +43,14 @@ jobs:
           # header pattern cannot parse "type!:" — breaking commits degrade
           # to default_bump (this is how 0.9.1 got cut instead of 1.0.0).
           commit_analyzer_preset: "conventionalcommits"
-          default_bump: "patch"
+          # "false" (not "patch"): eligible commits that select no bump
+          # (docs, chore, style, test, refactor) must mint no tag. Only
+          # feat/fix/perf/breaking select a bump; everything else rides the
+          # changelog of the next shippable release. Verified against the v7
+          # README ("set false to avoid generating a new tag when none is
+          # explicitly provided"); there is no per-type "skip" value, so do
+          # not invent one here — a wrong value degrades silently to a bump.
+          default_bump: "false"
           release_branches: "main"
 
       - name: Build Release Bundle
