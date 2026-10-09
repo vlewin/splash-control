@@ -108,6 +108,13 @@ lint_check "extraArgs is a multiline TextEditor" \
 lint_check "announce toggle is paired to the alias name" \
     "grep -q 'announceServedName' Sources/SplashControl/SettingsView.swift"
 
+# 9. Info declares the tested splash range (issue #4). The adjacent live
+#    "Inference engine" row shows whatever is running; without the declared
+#    window a mismatched server renders silently incomplete data.
+INFO=Sources/SplashControl/InfoView.swift
+lint_check "Info declares the supported splash range" \
+    "grep -q 'supportedSplash' '$INFO' && grep -q 'Engine support' '$INFO'"
+
 if [ "$lint_failures" -ne 0 ]; then
     echo ""
     echo "$lint_failures layout safety lint(s) FAILED. Aborting."
