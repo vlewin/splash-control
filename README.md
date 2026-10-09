@@ -15,6 +15,9 @@ Native macOS menu-bar controller and real-time telemetry dashboard for the [Spla
   <img src="https://img.shields.io/badge/Swift-5.10%2B-orange?style=flat-square" alt="Swift 5.10+" />
   <img src="https://img.shields.io/badge/Dependencies-Zero%20External%20SPM-green?style=flat-square" alt="Zero Dependencies" />
   <img src="https://img.shields.io/badge/Inference-IncoAI%20Splash-purple?style=flat-square" alt="Splash LLM Runtime" />
+  <a href="https://github.com/vlewin/splash-control/releases/latest"><img src="https://img.shields.io/github/v/release/vlewin/splash-control?style=flat-square&label=release" alt="Latest release" /></a>
+  <a href="https://github.com/vlewin/splash-control/actions/workflows/pull-request.yml"><img src="https://img.shields.io/github/actions/workflow/status/vlewin/splash-control/pull-request.yml?style=flat-square&label=ci" alt="CI status" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache--2.0-blue?style=flat-square" alt="Apache-2.0 license" /></a>
 </p>
 
 ---
@@ -118,6 +121,18 @@ open dist/Splash.app
 ```
 
 You can move `dist/Splash.app` to your `/Applications` directory.
+
+#### First launch: Gatekeeper
+
+The bundle is ad-hoc signed and **not notarized**, so macOS Gatekeeper blocks
+the first open with a "can't be opened because the developer cannot be verified"
+warning. Dismiss it once, either:
+
+- **Control-click (or right-click) `Splash.app` → Open → Open** in the dialog, or
+- **System Settings → Privacy & Security** → find the blocked entry → **Open Anyway**.
+
+This is a one-time action. From then on the app opens normally from wherever you
+keep it.
 
 ### Option 2: Swift Package Manager (Development)
 
