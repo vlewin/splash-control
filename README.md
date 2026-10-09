@@ -122,6 +122,18 @@ open dist/Splash.app
 
 You can move `dist/Splash.app` to your `/Applications` directory.
 
+#### First launch: Gatekeeper
+
+The bundle is ad-hoc signed and **not notarized**, so macOS Gatekeeper blocks
+the first open with a "can't be opened because the developer cannot be verified"
+warning. Dismiss it once, either:
+
+- **Control-click (or right-click) `Splash.app` → Open → Open** in the dialog, or
+- **System Settings → Privacy & Security** → find the blocked entry → **Open Anyway**.
+
+This is a one-time action. From then on the app opens normally from wherever you
+keep it.
+
 ### Option 2: Swift Package Manager (Development)
 
 ```bash
