@@ -1,0 +1,18 @@
+cff-version: 1.2.0
+message: "If you use Splash Control, please cite it."
+title: "Splash Control"
+abstract: "Native macOS menu-bar controller and real-time telemetry dashboard for the Splash local LLM inference engine."
+type: software
+authors:
+  - family-names: Lewin
+    given-names: Vlad
+license: Apache-2.0
+repository-code: "https://github.com/vlewin/splash-control"
+references:
+  - type: software
+    title: Splash
+    authors:
+      - name: inco.ai
+    license: Apache-2.0
+    repository-code: "https://github.com/incoai/splash"
+    url: "https://inco.ai/blog/splash/"
