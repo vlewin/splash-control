@@ -318,6 +318,11 @@ final class TrayController: NSObject, NSMenuDelegate {
   /// so the scan is cached and this guard only avoids rebuilding identical items.
   private var modelIDs: [String] = []
   private var mismatchItem: NSMenuItem!
+  private var contextSelectItem: NSMenuItem!
+  private var contextMenu: NSMenu!
+  private var contextMenuItems: [NSMenuItem] = []
+  /// Last list the Context submenu was built from; guards the rebuild.
+  private var contextIDs: [String] = []
   private var startItem: NSMenuItem!
   private var restartItem: NSMenuItem!
   private var stopItem: NSMenuItem!
@@ -371,6 +376,13 @@ final class TrayController: NSObject, NSMenuDelegate {
     mismatchItem.isEnabled = false
     mismatchItem.isHidden = true
     menu.addItem(mismatchItem)
+
+    contextMenu = NSMenu()
+    contextIDs = []
+    contextSelectItem = NSMenuItem(title: "Context: Auto", action: nil, keyEquivalent: "")
+    contextSelectItem.image = Self.menuIcon("text.alignleft")
+    contextSelectItem.submenu = contextMenu
+    menu.addItem(contextSelectItem)
 
     startItem = actionItem("Start Server", "play.fill", #selector(startAction))
     menu.addItem(startItem)
@@ -574,6 +586,25 @@ final class TrayController: NSObject, NSMenuDelegate {
     config.config.model = id
   }
 
+  @objc private func selectContext(_ sender: NSMenuItem) {
+    guard let id = sender.representedObject as? String else { return }
+    let value: String? = id.isEmpty ? nil : id
+    if config.config.maxContext == value { return }
+    // The config sink saves but only restarts on a model change: `--max-context`
+    // is read at spawn, so a server that is up needs a restart to pick the new
+    // value up (issue #8). Stopped means the next start takes it.
+    config.config.maxContext = value
+    switch process.state {
+    case .running, .starting:
+      let serving = stats.latest?.instance?.model
+      Task { [weak self] in
+        await self?.process.hardRestart(serving: serving, force: true)
+      }
+    default:
+      break
+    }
+  }
+
   /// Rebuilds the Model submenu from the models on disk. Called on every
   /// `menuWillOpen`, so the list the user looks at is never stale: a model
   /// installed from a terminal appears the next time the menu opens, with no
@@ -604,6 +635,29 @@ final class TrayController: NSObject, NSMenuDelegate {
       item.representedObject = id
       modelMenu.addItem(item)
       modelMenuItems.append(item)
+    }
+  }
+
+  /// Rebuilds the Context submenu: the rows the host can afford plus whatever
+  /// is configured, so a value outside the rows stays selectable instead of
+  /// silently disappearing from the menu. `""` is the nil (Auto) sentinel.
+  private func rebuildContextMenu() {
+    var ids = SplashConfig.contextChoices(physicalGiB: HostMemory.physicalGiB)
+    let configured = config.config.maxContext ?? ""
+    if !ids.contains(configured) { ids.append(configured) }
+    guard ids != contextIDs else { return }  // unchanged: leave the items alone
+    contextIDs = ids
+
+    contextMenu.removeAllItems()
+    contextMenuItems.removeAll()
+    for id in ids {
+      let item = NSMenuItem(
+        title: id.isEmpty ? "Auto" : id,
+        action: #selector(selectContext(_:)), keyEquivalent: "")
+      item.target = self
+      item.representedObject = id
+      contextMenu.addItem(item)
+      contextMenuItems.append(item)
     }
   }
 
@@ -660,6 +714,7 @@ final class TrayController: NSObject, NSMenuDelegate {
   func menuNeedsUpdate(_ menu: NSMenu) {
     let s = stats.latest
     rebuildModelMenu()
+    rebuildContextMenu()
     let liveModel = s?.instance?.model ?? config.config.model
     let shortModel = (liveModel as NSString).lastPathComponent
     updateHeader(shortModel: shortModel, status: s)
@@ -672,6 +727,12 @@ final class TrayController: NSObject, NSMenuDelegate {
 
     for item in modelMenuItems {
       item.state = (item.representedObject as? String) == config.config.model ? .on : .off
+    }
+
+    contextSelectItem.title = "Context: \(config.config.maxContext ?? "Auto")"
+    for item in contextMenuItems {
+      item.state =
+        (item.representedObject as? String) == (config.config.maxContext ?? "") ? .on : .off
     }
 
     // The status line above shows the *serving* model and the menu checkmark
