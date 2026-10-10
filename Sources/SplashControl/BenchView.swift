@@ -36,6 +36,9 @@ struct BenchSection: View {
     }
     // Only the results block swaps, and only between two fixed-size states.
     .animation(.easeInOut(duration: 0.2), value: bench.results.isEmpty)
+    // Re-point the ANE picker at the saved value each time the tab is opened:
+    // the bench never writes the toggle, but a Settings flip can outdate it.
+    .onAppear { bench.syncAneEnabled() }
   }
 
   private var head: some View {
@@ -176,8 +179,10 @@ struct BenchSection: View {
         Button {
           pickImage()
         } label: {
+          // "(Optional)" moved to the help: the row funds its width for the
+          // ANE picker, and the help already opens with "Optional.".
           Label(
-            bench.imagePath.map { imageLabel($0) } ?? "Add Image (Optional)",
+            bench.imagePath.map { imageLabel($0) } ?? "Add Image",
             systemImage: "photo")
         }
         .controlSize(.regular)
@@ -187,26 +192,51 @@ struct BenchSection: View {
         )
         .frame(maxWidth: .infinity, alignment: .leading)
 
-        HStack(spacing: 8) {
-          Text("Context:")
-            .font(.subheadline)
-            .foregroundStyle(.secondary)
-            .lineLimit(1)
-          Picker(
-            "Context",
-            selection: Binding(
-              get: { bench.longContextK },
-              set: { bench.setLongContext($0) })
-          ) {
-            ForEach(BenchRules.LongContext.options, id: \.self) {
-              Text("\($0)K").tag($0)
+        HStack(spacing: 12) {
+          HStack(spacing: 8) {
+            Text("Context:")
+              .font(.subheadline)
+              .foregroundStyle(.secondary)
+              .lineLimit(1)
+            Picker(
+              "Context",
+              selection: Binding(
+                get: { bench.longContextK },
+                set: { bench.setLongContext($0) })
+            ) {
+              ForEach(BenchRules.LongContext.options, id: \.self) {
+                Text("\($0)K").tag($0)
+              }
             }
+            .labelsHidden()
+            .pickerStyle(.segmented)
+            .frame(width: 228)
+            .disabled(bench.phase != .idle && bench.phase != .done)
+            .help("Size of the long-context scenario (KV cache stress test).")
           }
-          .labelsHidden()
-          .pickerStyle(.segmented)
-          .frame(width: 228)
-          .disabled(bench.phase != .idle && bench.phase != .done)
-          .help("Size of the long-context scenario (KV cache stress test).")
+          .fixedSize()
+          HStack(spacing: 8) {
+            Text("ANE:")
+              .font(.subheadline)
+              .foregroundStyle(.secondary)
+              .lineLimit(1)
+            Picker(
+              "ANE",
+              selection: $bench.aneEnabled
+            ) {
+              Text("on").tag(true)
+              Text("off").tag(false)
+            }
+            .labelsHidden()
+            .pickerStyle(.segmented)
+            .frame(width: 100)
+            .disabled(bench.phase != .idle && bench.phase != .done)
+            .help(
+              "Neural Engine prefill split for this run. on = the 1.3.0 default, "
+                + "the engine decides; off = force --disable-ane (GPU-only prefill). "
+                + "Preselected from your Settings value, which is restored after the run; "
+                + "the measured state is stamped on the results instead.")
+          }
         }
         .fixedSize()
 
@@ -632,6 +662,11 @@ struct BenchSection: View {
         Text(ModelCatalog.displayName(for: model))
           .font(.subheadline.weight(.semibold))
         statusBadge(for: model)
+        if let ane = bench.aneStates[model] {
+          Text("ANE \(ane)")
+            .font(.caption2)
+            .foregroundStyle(.tertiary)
+        }
         if let mean {
           Text(String(format: "mean %.1f tok/s", mean))
             .font(.caption.weight(.medium))

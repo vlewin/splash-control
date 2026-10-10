@@ -1278,6 +1278,10 @@ struct DashboardView: View {
     // bytes resident, false as a statement about the model.
     let pct = released ? nil : g.flatMap { x in budget.flatMap { b in b > 0 ? x / b * 100 : nil } }
     let pm = stats.latest?.memoryPressure
+    // The hero is pressure's prominent home: the Decode & request tile became
+    // the Neural Engine tile (issue #3), so the state reads here now. nil =
+    // pre-1.3.0 or unanswered: keep the old text, never a fake "ok".
+    let pressureText = pm.map { "· pressure \($0)" } ?? "budget · Metal"
     let accent: Color
     if pm == "critical" {
       accent = .red
@@ -1310,7 +1314,7 @@ struct DashboardView: View {
       accent: accent,
       caption: released
         ? "weights released · on demand"
-        : "\(pct.map { String(format: "%.0f", $0) } ?? "-")% of \(budget.map { String(format: "%.0f", $0) } ?? "-") GiB budget · Metal",
+        : "\(pct.map { String(format: "%.0f", $0) } ?? "-")% of \(budget.map { String(format: "%.0f", $0) } ?? "-") GiB \(pressureText)",
       icon: icon
     )
   }
@@ -1484,12 +1488,27 @@ struct DashboardView: View {
           title: "Draft acceptance",
           value: fmt(s?.metrics?.draftAcceptanceRate.map { $0 * 100 }, "%.0f", suffix: "%"),
           caption: "spec-decode accepts")
-        let pm = s?.memoryPressure
+        // Neural Engine FFN split (splash 1.3.0+): state as the value,
+        // share + reruns as the caption. Takes the Memory pressure slot —
+        // that signal already lives, more prominently, in the Memory hero's
+        // accent + caption. `reason` is free text and is never rendered.
+        let aneState = s?.aneFfn?.state
         Tile(
-          title: "Memory pressure",
-          value: pm ?? "—",
-          warning: pm == "warning" || pm == "critical",
-          caption: "engine self-report")
+          title: "Neural Engine",
+          value: aneState ?? "—",
+          warning: aneState == "stopped",
+          caption: {
+            guard let aneState else { return "not reported by this server" }
+            if aneState == "off" { return "GPU-only prefill" }
+            if aneState == "stopped" { return "split halted · see Logs" }
+            let share =
+              s?.aneFfn?.share.map { String(format: "share %.0f%%", $0 * 100) } ?? "share —"
+            let reruns = s?.aneFfn?.reruns.map { "\($0) reruns" } ?? "— reruns"
+            return "\(share) · \(reruns)"
+          }(),
+          alert: aneState == "stopped"
+            ? "The split stopped for the life of the process; it re-engages on the next engine restart. The engine's warning is in Logs."
+            : nil)
       }
     }
   }

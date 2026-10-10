@@ -665,6 +665,12 @@ struct SettingsView: View {
         Divider().opacity(0.4)
 
         toggleRow(
+          "Disable Neural Engine", "GPU-only prefill FFN (--disable-ane)",
+          warning: config.config.disableAne && !process.launchArgs.contains("--disable-ane")
+            ? "On but not passed — the resolved splash binary predates 1.3.0" : nil,
+          isOn: $config.config.disableAne,
+          help: "1.3.0 enables the ANE split by default; this keeps the FFN on the GPU.")
+        toggleRow(
           "Disable Web UI", "Disable the browser chat interface (--no-webui)",
           isOn: $config.config.noWebUI)
         toggleRow(
