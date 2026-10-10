@@ -913,6 +913,20 @@ check("languageOnly survives a save/load round-trip",
           SplashProcess.buildLaunchArgs(SplashConfig(), supports: all)
               .filter { $0 == "--persistent-cache" || $0 == "--idle-release" }, [])
 
+    // `--disable-ane` is splash 1.3.0+: same crash-loop guard, boolean shape.
+    let ane: Set<String> = ["--disable-ane"]
+    func withAne(_ on: Bool) -> SplashConfig {
+        var z = SplashConfig()
+        z.disableAne = on
+        return z
+    }
+    check("gated: --disable-ane passes when the binary advertises it",
+          SplashProcess.buildLaunchArgs(withAne(true), supports: ane).contains("--disable-ane"), true)
+    check("gated: --disable-ane is dropped when the probe found nothing",
+          SplashProcess.buildLaunchArgs(withAne(true), supports: []).contains("--disable-ane"), false)
+    check("gated: default config passes no --disable-ane",
+          SplashProcess.buildLaunchArgs(withAne(false), supports: ane).contains("--disable-ane"), false)
+
     // `--persistent-cache` without a tier is not a warning, it is exit 2:
     // "splash: error: --persistent-cache needs --max-cache-disk". Settings
     // disables the toggle when the tier is off but never clears the stored

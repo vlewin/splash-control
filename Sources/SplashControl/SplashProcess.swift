@@ -181,7 +181,7 @@ final class SplashProcess: ObservableObject {
   /// never passed, whatever the config says.
   nonisolated static let gatedFlags = [
     "--persistent-cache", "--idle-release", "--served-model-name", "--announce-served-name",
-    "--default-reasoning-effort",
+    "--default-reasoning-effort", "--disable-ane",
   ]
 
   /// Fills `serveFlags` from the binary about to be exec'd. Runs once per spawn
@@ -205,6 +205,7 @@ final class SplashProcess: ObservableObject {
     }
     if config.announceServedName { want.append("--announce-served-name") }
     if let e = config.reasoningEffort, !e.isEmpty { want.append("--default-reasoning-effort") }
+    if config.disableAne { want.append("--disable-ane") }
     return want.filter { serveFlags.contains($0) }
   }
 
@@ -307,6 +308,11 @@ final class SplashProcess: ObservableObject {
       let idle = Self.sanitizedIdleRelease(cfg.idleRelease)
     {
       args += ["--idle-release", idle]
+    }
+    // Boolean gate, no value to sanitize: on means the flag, off means
+    // nothing. `--disable-ane` is 1.3.0+; older binaries reject it outright.
+    if cfg.disableAne, supports.contains("--disable-ane") {
+      args += ["--disable-ane"]
     }
     // `--announce-served-name` without a name is refused by the same logic:
     // it is only meaningful alongside `--served-model-name`, so the pairing
