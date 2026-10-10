@@ -1,6 +1,6 @@
 import Foundation
 
-/// Codable mirror of `GET /status` as served by splash 1.2.0 (`schema_version 6`).
+/// Codable mirror of `GET /status` as served by splash 1.2.0–1.3.0 (`schema_version 6`).
 /// Optional everywhere the server may omit a key; consumers must tolerate nils.
 /// Keys this DTO does not model yet (`latency`, `frontend`, `response_store`,
 /// `image_cache`, `grammar_cache`, `model_timing`, `draft_context`, `warmup`,
@@ -39,6 +39,10 @@ public struct StatusDTO: Codable, Equatable {
   /// splash 1.2.1+. Absent on 1.2.0 and earlier, which is why every key is
   /// optional and why `StatsModel.weightsReleased` keeps a fallback.
   public var weights: Weights?
+  /// splash 1.3.0+: the prefill FFN's Neural Engine split. `state` is `split`
+  /// while it serves, `off` when startup left the GPU alone, `stopped` once the
+  /// breaker stopped it (until engine restart).
+  public var aneFfn: AneFfn?
 
   public enum CodingKeys: String, CodingKey {
     case ready
@@ -50,9 +54,10 @@ public struct StatusDTO: Codable, Equatable {
     case memoryActual = "memory_actual"
     case memoryGovernor = "memory_governor"
     case kv, state, cache, identity, disk, weights
+    case aneFfn = "ane_ffn"
   }
 
-  /// splash 1.2.1+ (tag 1.2.1, not yet on a live server here). The engine
+  /// splash 1.2.1+. The engine
   /// unwires backend buffers and frees the weights `idle_release_seconds`
   /// after the last request, restoring them on the next one.
   public struct Weights: Codable, Equatable {
@@ -67,6 +72,38 @@ public struct StatusDTO: Codable, Equatable {
     public enum CodingKeys: String, CodingKey {
       case idleReleaseSeconds = "idle_release_seconds"
       case released, restores
+    }
+  }
+
+  /// splash 1.3.0+: the prefill FFN's Neural Engine split — how much of the
+  /// prefill FFN the engine routes to the Neural Engine, and what it has run
+  /// since engine start. Absent on 1.2.x, which is why every key is optional.
+  public struct AneFfn: Codable, Equatable {
+    /// `split` while serving, `off` when startup left the GPU alone,
+    /// `stopped` once the breaker stopped it (until engine restart).
+    public var state: String?
+    /// Fraction of the FFN's channels routed to the Neural Engine; 0 when off.
+    public var share: Double?
+    /// Minimum prompt-chunk size, in rows, the split applies to; 0 when off.
+    public var minimumRows: Int?
+    /// The start's outcome, or why the split stopped. Unbounded free text from
+    /// the engine (a full sentence) — diagnostics only; never render it raw in
+    /// the UI or a log line.
+    public var reason: String?
+    /// Prefill commands the split ran, and the Neural Engine's evaluations in
+    /// them, since engine start.
+    public var splitCommands: UInt64?
+    public var evaluations: UInt64?
+    /// The Neural Engine's milliseconds over those evaluations.
+    public var aneMs: Double?
+    /// Chunks the GPU ran again alone after the split's work for them failed.
+    public var reruns: UInt64?
+    public enum CodingKeys: String, CodingKey {
+      case state, reason, reruns, evaluations
+      case share
+      case minimumRows = "minimum_rows"
+      case splitCommands = "split_commands"
+      case aneMs = "ane_ms"
     }
   }
 
@@ -156,6 +193,13 @@ public struct StatusDTO: Codable, Equatable {
     public var waiting: Int?
     public var waitingMemory: Int?
     public var waitingConcurrency: Int?
+    /// Admission's own marks (upstream b6570dd): requests held behind one
+    /// refused memory, and requests waiting on a disk restore. On the wire
+    /// since 1.2.0; the DTO simply never mirrored them. Not sub-counters of
+    /// `waiting` — `waiting` stays memory + concurrency — so never sum these
+    /// into the dot.
+    public var heldBehindRefusal: Int?
+    public var restoring: Int?
     public var suspended: Int?
     public var draining: Bool?
     public var oldestWaitMs: Double?
@@ -163,6 +207,8 @@ public struct StatusDTO: Codable, Equatable {
       case waiting, suspended, draining
       case waitingMemory = "waiting_memory"
       case waitingConcurrency = "waiting_concurrency"
+      case heldBehindRefusal = "held_behind_refusal"
+      case restoring
       case oldestWaitMs = "oldest_wait_ms"
     }
   }

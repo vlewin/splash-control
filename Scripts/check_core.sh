@@ -166,7 +166,7 @@ let full = dto("""
    "device":{"device_name":"Mac"},"model":{"model_name":"Qwen3.6-35B-A3B","maximum_context_tokens":262144}},
  "memory_actual":{"current_bytes":10,"allocated_bytes":11,"dense_bytes":99,"peak_bytes":12},
  "memory_governor":{"headroom_bytes":13,"charged_bytes":5,"observed_resident_bytes":99,"growth_allowed":true,"system_pressure":"normal","denied_reservations":14},
- "admission":{"waiting":1,"waiting_memory":2,"waiting_concurrency":3,"suspended":4,"draining":true,"oldest_wait_ms":1500},
+ "admission":{"waiting":1,"waiting_memory":2,"waiting_concurrency":3,"held_behind_refusal":5,"restoring":6,"suspended":4,"draining":true,"oldest_wait_ms":1500},
  "requests":{"submitted":5,"completed":6,"failed":7,"cancelled":8},
  "scheduler":{"queued":9,"prefilling":10,"decoding":11,"waiting_mask":12,"waiting_prefix":13,
    "waiting_resources":14,"terminal":15,"decode_batches":16},
@@ -190,7 +190,9 @@ let full = dto("""
     "kv_blocks":68,"kv_bytes":69,"kv_demotions":70,"kv_demotion_failures":71,
     "kv_demotions_refused":72,"kv_restores":73,"kv_restore_failures":74,"kv_pending_pages":75},
   "identity":{"cache":{"build_id":"bid","dtype":"q8s8"}},
- "weights":{"idle_release_seconds":600,"released":false,"restores":2}}
+ "weights":{"idle_release_seconds":600,"released":false,"restores":2},
+ "ane_ffn":{"state":"split","share":0.41,"minimum_rows":640,"reason":"r","split_commands":3,
+  "reruns":1,"ane_ms":1234.5,"evaluations":192}}
 """)
 
 // BUG-9 guard, generalised. This has now bitten three times in one session: a
@@ -229,6 +231,8 @@ check("memory_governor.system_pressure", full.memoryGovernor?.systemPressure, "n
 check("admission.waiting_memory", full.admission?.waitingMemory, 2)
 check("admission.waiting_concurrency", full.admission?.waitingConcurrency, 3)
 check("admission.oldest_wait_ms", full.admission?.oldestWaitMs, 1500.0)
+check("admission.held_behind_refusal", full.admission?.heldBehindRefusal, 5)
+check("admission.restoring", full.admission?.restoring, 6)
 check("scheduler.waiting_mask", full.scheduler?.waitingMask, 12)
 check("scheduler.decode_batches", full.scheduler?.decodeBatches, 16)
 check("metrics.decode_tokens_per_second", full.metrics?.decodeTokensPerSecond, 17.5)
@@ -247,6 +251,11 @@ check("kv.block_tokens", full.kv?.blockTokens, 45)
 check("kv.reclaimable_bytes", full.kv?.reclaimableBytes, 56)
 check("cache.hit_rate", full.cache?.hitRate, 0.5)
 check("identity.cache.dtype", full.identity?.cache?.dtype, "q8s8")
+check("ane_ffn.state", full.aneFfn?.state, "split")
+check("ane_ffn.share", full.aneFfn?.share, 0.41)
+check("ane_ffn.minimum_rows", full.aneFfn?.minimumRows, 640)
+check("ane_ffn.split_commands", full.aneFfn?.splitCommands, 3)
+check("ane_ffn.ane_ms", full.aneFfn?.aneMs, 1234.5)
 
 // Schema 6 renamed four keys. The all-keys payload above carries BOTH
 // spellings, so these four assertions pin the coalescing order: the schema 6
