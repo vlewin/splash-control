@@ -1,6 +1,5 @@
 name: Splash server issue (upstream)
 description: The splash runtime itself misbehaves, not Splash Control
-title: ""
 labels: [upstream]
 body:
   - type: markdown

@@ -1,6 +1,5 @@
 name: Feature request
 description: Propose an idea for Splash Control
-title: ""
 labels: [enhancement]
 body:
   - type: textarea

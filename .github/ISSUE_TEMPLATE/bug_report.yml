@@ -1,6 +1,5 @@
 name: Bug report
 description: Something in Splash Control misbehaves
-title: ""
 labels: [bug]
 body:
   - type: textarea
