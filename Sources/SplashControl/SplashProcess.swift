@@ -236,6 +236,9 @@ final class SplashProcess: ObservableObject {
   /// so the server's own defaults (SPLASH_PORT, SPLASH_API_KEY, …) apply.
   var launchArgs: [String] { Self.buildLaunchArgs(config, supports: serveFlags) }
 
+  /// Whether the probed binary accepts `--disable-ane` (splash 1.3.0+).
+  var supportsDisableAne: Bool { serveFlags.contains("--disable-ane") }
+
   /// The exact command `start()` will run — surfaced in Settings so the user
   /// can see (and copy) what the app applies.
   var launchCommandPreview: String {

@@ -52,6 +52,12 @@ lint_check "Context: label has lineLimit(1)" \
 lint_check "Context: centre group has fixedSize()" \
     "grep -A 20 'Text(\"Context:\")' '$BENCH' | grep -q 'fixedSize()'"
 
+# The ANE picker is the second run-wide knob in the same rigid centre group.
+lint_check "ANE: label has lineLimit(1)" \
+    "grep -A 4 'Text(\"ANE:\")' '$BENCH' | grep -q 'lineLimit(1)'"
+lint_check "ANE: picker has a pinned width" \
+    "grep -A 15 'Text(\"ANE:\")' '$BENCH' | grep -q 'frame(width: 100)'"
+
 # 2. Bar-chart values and the [BEST] badge. 82 pt could not hold "10.7 GiB" plus
 #    the badge and wrapped it into two lines.
 lint_check "bar chart value has lineLimit(1)" \
@@ -62,8 +68,10 @@ lint_check "BEST badge has lineLimit(1)" \
 # 3. The configuration row is three columns, not two spacers: equal flexible
 #    wings around a rigid centre. Two Spacers put the centre half a button-width
 #    difference off true centre, and squeezed the label to 2.67 pt.
+# The label reads "Add Image": "(Optional)" moved to the help, because the row
+# funds its width for the ANE picker and the help already opens with "Optional.".
 lint_check "configCard has a leading wing" \
-    "grep -A 8 'Add Image (Optional)' '$BENCH' | grep -q 'alignment: .leading'"
+    "grep -A 8 'Add Image' '$BENCH' | grep -q 'alignment: .leading'"
 lint_check "configCard has a trailing wing" \
     "grep -A 25 'Label(\"Run Benchmark\"' '$BENCH' | grep -q 'alignment: .trailing'"
 
