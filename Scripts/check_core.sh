@@ -633,7 +633,7 @@ func logChecks() {
     let badDir = URL(fileURLWithPath: NSTemporaryDirectory())
         .appendingPathComponent("splashlog-bad-\(UUID().uuidString)", isDirectory: true)
     // A path that cannot be created: a file where a directory must be.
-    try? fm.createFile(atPath: badDir.path, contents: nil)
+    fm.createFile(atPath: badDir.path, contents: nil)
     // Manual rotation must be the same operation as size-triggered rotation: the
     // Logs tab button and the automatic 1 MB roll share one code path, so there is
     // only ever one scheme on disk.
@@ -726,7 +726,10 @@ func logChecks() {
           "prism-ml/Ternary-Bonsai-2-27B-gguf:PQ2_0")
 }
 
-MainActor.assumeIsolated { statsChecks() }
+// The file's top-level `await` makes this code async and MainActor-isolated,
+// so the @MainActor sections are called directly: assumeIsolated warns from
+// async contexts and hardens to an error in Swift 6.
+statsChecks()
 
 // MARK: - SplashConfig tolerant decode
 let empty = try! JSONDecoder().decode(SplashConfig.self, from: Data("{}".utf8))
@@ -1119,7 +1122,7 @@ func modelCatalogChecks() {
     }
 }
 
-MainActor.assumeIsolated { chartPolicyChecks(); chartBucketingChecks(); argChecks(); adoptionChecks(); trayLookChecks(); modelCatalogChecks(); modelStatsChecks(); totalLoadChecks(); logChecks(); modelMismatchChecks() }
+chartPolicyChecks(); chartBucketingChecks(); argChecks(); adoptionChecks(); trayLookChecks(); modelCatalogChecks(); modelStatsChecks(); totalLoadChecks(); logChecks(); modelMismatchChecks()
 
 // MARK: - The menu-bar dot
 //
@@ -1128,7 +1131,6 @@ MainActor.assumeIsolated { chartPolicyChecks(); chartBucketingChecks(); argCheck
 // policy is gone (BUG-11 was fixed upstream and re-tested 2026-10-05), and the
 // governor now reclaims on its own.
 @MainActor func trayLookChecks() {
-    let GiB: Double = 1_073_741_824
 
     // MARK: The two axes. Service ("is splash up") and agent ("is the model
     // working") are different questions; conflating them is what produced a
