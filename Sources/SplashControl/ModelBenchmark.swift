@@ -353,6 +353,10 @@ struct BenchmarkParamKey: Codable, Hashable {
   var maxMemory: String
   var maxCacheDisk: String
   var powerMode: String
+  /// The ANE split the run requested: `true` = engine decides, `false` =
+  /// `--disable-ane`. Optional because runs recorded before the picker existed
+  /// cannot know it — `insert` keeps them beside `on` runs instead of merging.
+  var aneEnabled: Bool?
 
   /// Identity of the parameter set. A joined string, not a hash: two runs that
   /// collide are indistinguishable when you are reading the file, and the
@@ -361,6 +365,7 @@ struct BenchmarkParamKey: Codable, Hashable {
     ([plan.joined(separator: ",")] + [
       String(longContextK), visionMode, kvFormat,
       maxMemory, maxCacheDisk, powerMode,
+      aneEnabled.map { $0 ? "ane on" : "ane off" } ?? "ane ?",
     ])
     .joined(separator: "|")
   }
@@ -390,10 +395,27 @@ struct BenchHistory: Codable {
   /// What the run was measured under. Optional because runs recorded before
   /// this existed have no way to know it — they are shown, just not comparable.
   var params: BenchmarkParamKey?
+  /// The ANE state each model's engine actually reported, model → stamp
+  /// ("split 41%" / "off" / "stopped"). Optional: pre-1.3.0 servers never
+  /// reported it, and neither did runs recorded before this field.
+  var aneStates: [String: String]?
+
+  /// The measured states as one word: the shared state when every model agrees,
+  /// "mixed" otherwise, nil when the server never reported any.
+  var aneSummary: String? {
+    guard let aneStates, !aneStates.isEmpty else { return nil }
+    let states = Set(
+      aneStates.values.map { $0.split(separator: " ").first.map(String.init) ?? "unreported" }
+    )
+    guard states.count == 1, let state = states.first else { return "mixed" }
+    return state
+  }
 
   /// What the run measured, in one line. Used for the stored-run menu.
   var humanSummary: String {
-    params?.label ?? "unattributed run · \(plan.count) models · \(longContextK)K"
+    var s = params?.label ?? "unattributed run · \(plan.count) models · \(longContextK)K"
+    if let ane = aneSummary { s += " · ANE \(ane)" }
+    return s
   }
 }
 
@@ -473,9 +495,18 @@ final class BenchmarkEngine: ObservableObject {
   @Published private(set) var plan: [String] = []
   /// Set by the picker in BenchView. Not private(set): the view owns choosing it.
   @Published var imagePath: String?
-  /// Long-context scenario size in thousands of tokens. The only run-wide knob:
-  /// prompt size is a property of the machine and the model, not of a scenario.
+  /// Long-context scenario size in thousands of tokens. Prompt size is a
+  /// property of the machine and the model, not of a scenario.
   @Published var longContextK: Int = BenchRules.LongContext.options[0]
+  /// Whether the run requests the ANE split (`false` = `--disable-ane`). The
+  /// second run-wide knob. Preselected from the saved config, and `on` means
+  /// "the engine decides" — its 1.3.0 default — so the *measured* state, not
+  /// this intent, is what the results are stamped with.
+  @Published var aneEnabled: Bool = true
+  /// The ANE state each model's engine reported, model → stamp. Ground truth
+  /// for the results on screen: a run requested `on` may still measure `off`
+  /// on a model the engine finds no gain in.
+  @Published private(set) var aneStates: [String: String] = [:]
   /// When the results on screen were measured. Set from the loaded history and
   /// from a fresh run, so the table always says whether it is live or restored.
   @Published private(set) var lastRunAt: Date?
@@ -505,12 +536,19 @@ final class BenchmarkEngine: ObservableObject {
   /// provisions one, so a 32K/64K/128K run leaves the server exactly as it
   /// found it and needs no restore restart.
   private var originalMaxContext: String?
+  /// The `--disable-ane` a run replaced, or nil when it replaced nothing —
+  /// the same shape as `originalMaxContext`: the flag is spawn-time, so the
+  /// first model's forced restart applies it and the restore re-spawns.
+  private var originalDisableAne: Bool?
 
   init(config: ConfigStore, process: SplashProcess, stats: StatsModel, history: ModelStats) {
     self.config = config
     self.process = process
     self.stats = stats
     self.history = history
+    // The picker mirrors the saved value, so an untouched Run behaves exactly
+    // as today and two back-to-back runs are comparable by default.
+    aneEnabled = !config.config.disableAne
     // The runs are already on disk by the time this runs, so the results table
     // is populated before the user opens the Statistics tab. Cleared by
     // `run()`, which means "these numbers are about to be replaced".
@@ -532,11 +570,20 @@ final class BenchmarkEngine: ObservableObject {
     plan = saved.plan
     longContextK = saved.longContextK
     runPrompts = saved.prompts
+    aneStates = saved.aneStates ?? [:]
     lastRunAt = saved.finishedAt
     selectedRunAt = saved.finishedAt
     SplashLog.shared.log(
       "bench_history_loaded rows=\(saved.results.count) "
         + "at=\(SplashLog.stamp.string(from: saved.finishedAt))")
+  }
+
+  /// Re-point the picker at the saved value. The bench never writes the
+  /// Settings toggle (the restore puts it back), so the config is the only
+  /// thing that can make the preselection stale — a Settings flip done while
+  /// the Benchmark tab is open. Called when the tab appears.
+  func syncAneEnabled() {
+    aneEnabled = !config.config.disableAne
   }
 
   /// Switch which stored parameter set is on screen.
@@ -567,7 +614,11 @@ final class BenchmarkEngine: ObservableObject {
     }
     let stamp = SplashLog.stamp.string(from: at)
       .replacingOccurrences(of: "T", with: " ").prefix(19)
-    return "Last run: \(stamp) · \(longContextK)K ctx · \(measuredModelCount) models"
+    var text = "Last run: \(stamp) · \(longContextK)K ctx · \(measuredModelCount) models"
+    if let run = runs.first(where: { $0.finishedAt == at }), let ane = run.aneSummary {
+      text += " · ANE \(ane)"
+    }
+    return text
   }
 
   /// Label for the stored-run menu. Falls back to a count so the trigger can
@@ -714,8 +765,16 @@ final class BenchmarkEngine: ObservableObject {
       )
       return
     }
+    guard aneEnabled || process.supportsDisableAne else {
+      phase = .failed(
+        "This splash binary predates 1.3.0, so it has no Neural Engine split to disable — "
+          + "its prefill always runs on the GPU. Pick “on” (its only mode) to benchmark it."
+      )
+      return
+    }
     guard canRun else { return }
     results = []
+    aneStates = [:]
     lastRunAt = nil
     cancelled = false
     // Real requests, synthetic prompts: keep them out of the serving history.
@@ -727,6 +786,7 @@ final class BenchmarkEngine: ObservableObject {
     runPrompts = [:]
     for p in prompts { runPrompts[p.id] = p.text }
     provisionContextIfNeeded()
+    provisionAneIfNeeded()
     task = Task { [weak self] in
       await self?.execute(plan: plan, prompts: prompts)
     }
@@ -793,13 +853,61 @@ final class BenchmarkEngine: ObservableObject {
     }
   }
 
+  /// What the config must say for the run in flight, or `nil` when it already
+  /// does and nothing may change. Pure, so the decision is testable without a
+  /// server — `selectedOn: true` means "don't pass `--disable-ane`".
+  nonisolated static func aneProvision(selectedOn: Bool, configuredDisableAne: Bool) -> Bool? {
+    let wanted = !selectedOn
+    return wanted == configuredDisableAne ? nil : wanted
+  }
+
+  /// The stamp a run carries per model: the engine's own verdict, with the
+  /// share attached while splitting (`reason` stays out — free text).
+  nonisolated static func aneLabel(_ a: StatusDTO.AneFfn) -> String {
+    guard let state = a.state else { return "unreported" }
+    if state == "split", let share = a.share {
+      return String(format: "split %.0f%%", share * 100)
+    }
+    return state
+  }
+
+  /// Sets `--disable-ane` for the run in flight, remembering what to put back.
+  /// Reaches the engine through the first model's forced `hardRestart`, exactly
+  /// like the context cap; a selection matching the config touches nothing.
+  private func provisionAneIfNeeded() {
+    let current = config.config.disableAne
+    guard let wanted = Self.aneProvision(selectedOn: aneEnabled, configuredDisableAne: current)
+    else { return }
+    originalDisableAne = current
+    config.config.disableAne = wanted
+    SplashLog.shared.log("bench_ane_provisioned disable=\(wanted)")
+  }
+
+  /// Puts the value back and re-spawns, so the engine actually runs with it
+  /// rather than merely being configured for it. No-op for a run that
+  /// provisioned nothing; the value is taken before the first await, the same
+  /// way `restoreContextIfNeeded` is, so a cancel race restarts at most once
+  /// per knob (a run that moved both pays two re-spawns, in order).
+  private func restoreAneIfNeeded() async {
+    guard let orig = originalDisableAne else { return }
+    originalDisableAne = nil
+    config.config.disableAne = orig
+    SplashLog.shared.log("bench_ane_restored disable=\(orig)")
+    if let serving = stats.latest?.instance?.model {
+      await process.hardRestart(serving: serving, force: true)
+    }
+  }
+
   func cancel() {
     cancelled = true
     task?.cancel()
     history.isSuppressed = false
     saveReport()
     if case .failed = phase {} else { phase = .idle }
-    Task { [weak self] in await self?.restoreContextIfNeeded() }
+    Task { [weak self] in
+      await self?.restoreContextIfNeeded()
+      await self?.restoreAneIfNeeded()
+    }
   }
 
   private func execute(plan: [String], prompts: [BenchPrompt]) async {
@@ -838,6 +946,13 @@ final class BenchmarkEngine: ObservableObject {
       let loadMemory: Double? = (stats.latest?.memoryActual?.currentBytes).map {
         Double($0) / 1_073_741_824
       }
+      // Ground truth for the stamp: the same /status snapshot that reported
+      // ready carries the engine's ANE verdict for this model. Per model on
+      // purpose — the split is calibrated per Mac+model+build, so one plan
+      // can honestly hold "split 41%" and "off" at once.
+      if let ane = stats.latest?.aneFfn, ane.state != nil {
+        aneStates[model] = Self.aneLabel(ane)
+      }
       for (n, prompt) in prompts.enumerated() {
         if cancelled { return }
         phase = .running(model: model, prompt: prompt.id)
@@ -855,6 +970,7 @@ final class BenchmarkEngine: ObservableObject {
     // and not just the saved one. The engine stays on the last plan model,
     // which `buildPlan` put there on purpose.
     await restoreContextIfNeeded()
+    await restoreAneIfNeeded()
   }
 
   /// Written on every exit that has results, so a cancelled run is still on
@@ -864,7 +980,7 @@ final class BenchmarkEngine: ObservableObject {
   /// one is for pasting, the other is for reloading into the UI.
   private func saveReport() {
     guard !results.isEmpty else { return }
-    BenchReport.write(results, plan: plan, longContextK: longContextK)
+    BenchReport.write(results, plan: plan, longContextK: longContextK, aneStates: aneStates)
     lastRunAt = Date()
     let params = BenchmarkParamKey(
       plan: plan, longContextK: longContextK, visionMode: visionMode,
@@ -873,13 +989,14 @@ final class BenchmarkEngine: ObservableObject {
       maxCacheDisk: (config.config.maxCacheDisk?.isEmpty == false
         && config.config.maxCacheDisk != "0")
         ? config.config.maxCacheDisk! : "off",
-      powerMode: runPowerMode)
+      powerMode: runPowerMode, aneEnabled: aneEnabled)
     var archive = BenchArchive.load()
     archive.insert(
       BenchHistory(
         finishedAt: lastRunAt ?? Date(), plan: plan,
         longContextK: longContextK, results: results,
-        prompts: runPrompts, params: params))
+        prompts: runPrompts, params: params,
+        aneStates: aneStates.isEmpty ? nil : aneStates))
     archive.save()
     runs = archive.runs
     selectedRunAt = lastRunAt
@@ -1054,6 +1171,7 @@ enum BenchReport {
   /// partial run is still on disk.
   static func write(
     _ results: [BenchResult], plan: [String], longContextK: Int,
+    aneStates: [String: String] = [:],
     to directory: URL? = nil
   ) {
     let dir = directory ?? ModelStats.directory
@@ -1092,6 +1210,7 @@ enum BenchReport {
         out += String(format: " (peak %.1fG)", peakMem)
       }
       if let o = rows.first?.order, o == plan.count - 1 { out += "  ran last (hottest)" }
+      if let ane = aneStates[model] { out += "  ANE \(ane)" }
       out += "\n"
       out +=
         "  "

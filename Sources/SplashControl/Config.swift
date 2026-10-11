@@ -26,6 +26,9 @@ struct SplashConfig: Codable, Equatable {
   var noWebUI: Bool = false
   /// Skip vision preparation and loading (`splash serve --language-only`)
   var languageOnly: Bool = false
+  /// Keep the prefill FFN on the GPU (`splash serve --disable-ane`).
+  /// splash 1.3.0+ only; omitted entirely on an older binary.
+  var disableAne: Bool = false
   /// Space-separated, maps to repeatable --allowed-host
   var allowedHost: String? = nil
   /// e.g. "128M" — --max-request-size; nil = server default
@@ -126,6 +129,7 @@ struct SplashConfig: Codable, Equatable {
 
   private enum CodingKeys: String, CodingKey {
     case model, port, maxMemory, maxContext, kvFormat, maxCacheDisk, noWebUI, languageOnly,
+      disableAne,
       allowedHost,
       maxRequestSize, maxImagePixels, apiKey, extraArgs, splashPath,
       servedModelName, announceServedName, reasoningEffort,
@@ -149,6 +153,7 @@ struct SplashConfig: Codable, Equatable {
     idleRelease = try c.decodeIfPresent(String.self, forKey: .idleRelease) ?? d.idleRelease
     noWebUI = try c.decodeIfPresent(Bool.self, forKey: .noWebUI) ?? d.noWebUI
     languageOnly = try c.decodeIfPresent(Bool.self, forKey: .languageOnly) ?? d.languageOnly
+    disableAne = try c.decodeIfPresent(Bool.self, forKey: .disableAne) ?? d.disableAne
     allowedHost = try c.decodeIfPresent(String.self, forKey: .allowedHost) ?? d.allowedHost
     maxRequestSize = try c.decodeIfPresent(String.self, forKey: .maxRequestSize) ?? d.maxRequestSize
     maxImagePixels = try c.decodeIfPresent(String.self, forKey: .maxImagePixels) ?? d.maxImagePixels
