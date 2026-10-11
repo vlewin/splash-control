@@ -168,7 +168,7 @@ func dto(_ json: String) -> StatusDTO { try! decoder.decode(StatusDTO.self, from
 // Every key the DTO claims to mirror, fed one minimal payload. A missing or
 // misspelled CodingKeys entry shows up here as nil and nowhere else.
 let full = dto("""
-{"ready":true,"maximum_context_tokens":131072,"memory_pressure":"normal",
+{"ready":true,"maximum_context_tokens":131072,"memory_pressure":"normal","thermal_state":"fair",
  "instance":{"model":"incoai/Qwen3.6-35B-A3B-Splash","port":9000,"started_at":1.5},
  "memory_plan":{"maximum_context_tokens":262144,"valid":true,
    "device":{"device_name":"Mac"},"model":{"model_name":"Qwen3.6-35B-A3B","maximum_context_tokens":262144}},
@@ -227,6 +227,7 @@ check("DTO: every encoded key has a stored property", emitted.subtracting(Set(st
 
 check("maximum_context_tokens", full.maximumContextTokens, 131072)
 check("memory_pressure", full.memoryPressure, "normal")
+check("thermal_state", full.thermalState, "fair")
 check("instance.model", full.instance?.model, "incoai/Qwen3.6-35B-A3B-Splash")
 check("instance.started_at", full.instance?.startedAt, 1.5)
 check("memory_plan.device.device_name", full.memoryPlan?.device?.deviceName, "Mac")

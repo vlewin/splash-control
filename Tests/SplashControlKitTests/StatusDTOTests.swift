@@ -51,6 +51,15 @@ func status130FixtureDecodes() throws {
   #expect(s.admission?.restoring != nil)
 }
 
+@Test("1.3.1 fixture decodes thermal_state, restore_failures, and idle_context_windows")
+func status131FixtureDecodes() throws {
+  let s = try JSONDecoder().decode(StatusDTO.self, from: try fixture("status_schema6_1_3_1.json"))
+  #expect(s.ready == true)
+  #expect(s.thermalState == "fair")
+  #expect(s.weights?.restoreFailures == 1)
+  #expect(s.state?.idleContextWindows == 3)
+}
+
 @Test("renamed key decodes to nil, not garbage")
 func renamedKeyDecodesToNil() throws {
   let json = #"{"ready":true,"max_context_tokens":99999}"#

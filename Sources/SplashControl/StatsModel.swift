@@ -72,12 +72,27 @@ struct Sample: Identifiable {
   var gap: Bool = false
 }
 
-/// A vertical annotation on the charts (power-mode switches, manual notes).
+/// A vertical annotation on the charts (power-mode switches, thermal state changes, manual notes).
 struct Marker: Identifiable, Codable, Equatable {
+  enum Severity: String, Codable {
+    case info
+    case warn
+    case critical
+  }
+
   var id = UUID()
   var date: Date
   var label: String
   var automatic: Bool
+  var severity: Severity? = .info
+
+  init(id: UUID = UUID(), date: Date, label: String, automatic: Bool, severity: Severity? = .info) {
+    self.id = id
+    self.date = date
+    self.label = label
+    self.automatic = automatic
+    self.severity = severity
+  }
 }
 
 /// Engine state read off `GET /status`.
@@ -329,6 +344,7 @@ final class StatsModel: ObservableObject {
   private var lastStatus: StatusDTO?
   private var lastSampleDate: Date?
   private var lastPowerMode: Int?
+  private var lastThermalState: String?
   private var markersURL: URL {
     let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
       .appendingPathComponent("SplashControl", isDirectory: true)
@@ -356,10 +372,28 @@ final class StatsModel: ObservableObject {
         if let last = markers.last, last.label == label, now.timeIntervalSince(last.date) < 60 {
           // same mode re-detected immediately — skip
         } else {
-          addMarker(label: label, automatic: true)
+          addMarker(label: label, automatic: true, severity: .info)
         }
       }
       lastPowerMode = pm
+    }
+
+    if let currentThermal = status.thermalState, !currentThermal.isEmpty {
+      if let previousThermal = lastThermalState, currentThermal != previousThermal {
+        let label = "Thermal: \(previousThermal) → \(currentThermal)"
+        let severity: Marker.Severity
+        switch currentThermal {
+        case "serious", "critical": severity = .critical
+        case "fair": severity = .warn
+        default: severity = .info
+        }
+        if let last = markers.last, last.label == label, now.timeIntervalSince(last.date) < 60 {
+          // flap suppression
+        } else {
+          addMarker(label: label, automatic: true, severity: severity)
+        }
+      }
+      lastThermalState = currentThermal
     }
 
     var sample = Sample(date: now)
@@ -486,8 +520,8 @@ final class StatsModel: ObservableObject {
 
   // MARK: - Markers
 
-  func addMarker(label: String, automatic: Bool = false) {
-    markers.append(Marker(date: Date(), label: label, automatic: automatic))
+  func addMarker(label: String, automatic: Bool = false, severity: Marker.Severity = .info) {
+    markers.append(Marker(date: Date(), label: label, automatic: automatic, severity: severity))
     persistMarkers()
   }
 

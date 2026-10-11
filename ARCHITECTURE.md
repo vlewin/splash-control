@@ -65,8 +65,9 @@ The installed runtime is the Homebrew stable release `incoai/tap/splash` (`/opt/
   - `latency.ttft` → `latency.http_ttft` (`splash_http_ttft_seconds` in `/metrics`)
   - New section in 1.2.1: `weights` (`idle_release_seconds`, `released`, `restores`).
 - `StatusDTO` must stay an **all-optional subset**: keys a release predates stay optional.
-- Supported splash range (tested-against, shown in the Info tab): **1.2.0 – 1.3.0**. Keep in sync with `InfoView.supportedSplash`. 1.3.0's `/status` is still schema 6 (8 is its native wire protocol, which this app never speaks).
+- Supported splash range (tested-against, shown in the Info tab): **1.2.0 – 1.3.1**. Keep in sync with `InfoView.supportedSplash`. 1.3.1's `/status` is still schema 6 (8 is its native wire protocol, which this app never speaks).
 - 1.3.0 adds `ane_ffn` (the Neural Engine prefill-FFN split; 8 keys, all optional in the DTO). `admission.held_behind_refusal`/`restoring` are schema-6 keys (on the wire since 1.2.0) the DTO never mirrored until now; they are admission's own marks, not sub-counters of `waiting`.
+- 1.3.1 adds `thermal_state` at root `/status` (macOS thermal throttling status: nominal/fair/serious/critical), `weights.restore_failures` (memory restore failures/timeouts after idle release), and `state.idle_context_windows`. Legacy Splash packages (`incoai/Qwen3.8-27B-Splash`) are deprecated upstream in favor of MLX targets (`mlx-community/Qwen3.8-27B-4bit`).
 
 ### 4.2 Model acceptance
 `splash serve --model owner/repo[:VARIANT]` resolves targets from metadata alone (`config.json` or GGUF header).

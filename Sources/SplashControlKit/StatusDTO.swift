@@ -1,6 +1,6 @@
 import Foundation
 
-/// Codable mirror of `GET /status` as served by splash 1.2.0–1.3.0 (`schema_version 6`).
+/// Codable mirror of `GET /status` as served by splash 1.2.0–1.3.1 (`schema_version 6`).
 /// Optional everywhere the server may omit a key; consumers must tolerate nils.
 /// Keys this DTO does not model yet (`latency`, `frontend`, `response_store`,
 /// `image_cache`, `grammar_cache`, `model_timing`, `draft_context`, `warmup`,
@@ -21,6 +21,8 @@ public struct StatusDTO: Codable, Equatable {
   public var ready: Bool?
   public var maximumContextTokens: Int?
   public var memoryPressure: String?
+  /// splash 1.3.1+: macOS thermal throttling state ("nominal", "fair", "serious", "critical").
+  public var thermalState: String?
   public var instance: Instance?
   public var admission: Admission?
   public var requests: Requests?
@@ -48,6 +50,7 @@ public struct StatusDTO: Codable, Equatable {
     case ready
     case maximumContextTokens = "maximum_context_tokens"
     case memoryPressure = "memory_pressure"
+    case thermalState = "thermal_state"
     case instance
     case admission, requests, scheduler, metrics, metal, transport
     case memoryPlan = "memory_plan"
@@ -69,9 +72,12 @@ public struct StatusDTO: Codable, Equatable {
     public var released: Bool?
     /// How many times the weights have been restored since launch.
     public var restores: UInt64?
+    /// splash 1.3.1+: How many times weight restores failed or timed out.
+    public var restoreFailures: UInt64?
     public enum CodingKeys: String, CodingKey {
       case idleReleaseSeconds = "idle_release_seconds"
       case released, restores
+      case restoreFailures = "restore_failures"
     }
   }
 
@@ -444,10 +450,13 @@ public struct StatusDTO: Codable, Equatable {
     /// schema 5 `resident_bytes`; removed in schema 6
     public var legacyResidentBytes: UInt64?
     public var evictions: Int?
+    /// splash 1.3.1+: idle context windows telemetry counter.
+    public var idleContextWindows: Int?
     public enum CodingKeys: String, CodingKey {
       case entries, bytes, evictions
       case allocatedBytes = "allocated_bytes"
       case legacyResidentBytes = "resident_bytes"
+      case idleContextWindows = "idle_context_windows"
     }
     /// State-cache memory held, in either schema.
     public var residentBytes: UInt64? { allocatedBytes ?? legacyResidentBytes }
