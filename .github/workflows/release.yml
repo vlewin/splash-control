@@ -81,9 +81,9 @@ jobs:
         # TAP_TOKEN secret — a classic PAT with 'repo' scope on the tap repo;
         # without it the step renders the cask and skips the push.
         run: |
-          cd dist
-          SHA256=$(cut -d ' ' -f1 "SplashControl-${{ steps.tag_version.outputs.new_tag }}.zip.sha256")
-          bash ../Scripts/render-cask.sh "${{ steps.tag_version.outputs.new_tag }}" "$SHA256"
+          # From the repo root: render-cask.sh writes dist/<tag>.cask itself.
+          SHA256=$(cut -d ' ' -f1 "dist/SplashControl-${{ steps.tag_version.outputs.new_tag }}.zip.sha256")
+          bash Scripts/render-cask.sh "${{ steps.tag_version.outputs.new_tag }}" "$SHA256"
           if [[ -z "${TAP_TOKEN:-}" ]]; then
             echo "::warning::TAP_TOKEN is not set — rendered the cask but did not publish it."
             echo "To enable: 1) create https://github.com/vlewin/tap (public),"
@@ -92,19 +92,23 @@ jobs:
             echo "The next release will publish the cask automatically."
             exit 0
           fi
-          git clone --depth 1 "https://x-access-token:${TAP_TOKEN}@github.com/vlewin/tap.git" tap
-          mkdir -p tap/Casks
-          cp "SplashControl-${{ steps.tag_version.outputs.new_tag }}.cask" tap/Casks/splash-control.rb
-          brew tap vlewin/tap tap
+          # Tap the real remote (public, so read needs no auth) and work
+          # inside its clone: a path-tapped dir does not resolve token
+          # audit in brew 7 ("No available formula or cask", v1.5.1).
+          brew tap vlewin/tap
+          TAPDIR="$(brew --repo vlewin/tap)"
+          mkdir -p "$TAPDIR/Casks"
+          cp "dist/SplashControl-${{ steps.tag_version.outputs.new_tag }}.cask" "$TAPDIR/Casks/splash-control.rb"
           brew audit --strict vlewin/tap/splash-control
-          git -C tap config user.name "github-actions[bot]"
-          git -C tap config user.email "github-actions[bot]@users.noreply.github.com"
-          git -C tap add Casks/splash-control.rb
-          if git -C tap diff --cached --quiet; then
+          git -C "$TAPDIR" config user.name "github-actions[bot]"
+          git -C "$TAPDIR" config user.email "github-actions[bot]@users.noreply.github.com"
+          git -C "$TAPDIR" add Casks/splash-control.rb
+          if git -C "$TAPDIR" diff --cached --quiet; then
             echo "Cask already at ${{ steps.tag_version.outputs.new_tag }}; nothing to push."
           else
-            git -C tap commit -m "splash-control: ${{ steps.tag_version.outputs.new_tag }}"
-            git -C tap push
+            git -C "$TAPDIR" commit -m "splash-control: ${{ steps.tag_version.outputs.new_tag }}"
+            git -C "$TAPDIR" remote set-url origin "https://x-access-token:${TAP_TOKEN}@github.com/vlewin/tap.git"
+            git -C "$TAPDIR" push origin HEAD:main
           fi
         env:
           TAP_TOKEN: ${{ secrets.TAP_TOKEN }}
