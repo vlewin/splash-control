@@ -104,7 +104,19 @@ The dashboard window dynamically adjusts its height per tab to fit its component
 
 ## Building & Installation
 
-### Option 1: Build the Standalone App Bundle (Recommended)
+### Option 1: Homebrew Cask
+
+Once the `vlewin/tap` repository exists (see `Scripts/render-cask.sh` — it is
+rendered and published by the release pipeline on every tagged release):
+
+```bash
+brew install --cask vlewin/tap/splash-control
+```
+
+The cask pulls the splash engine from `incoai/tap` automatically. Until the
+tap is created, use Option 2.
+
+### Option 2: Build the Standalone App Bundle
 
 To assemble and ad-hoc sign `dist/Splash.app`:
 
@@ -134,7 +146,7 @@ warning. Dismiss it once, either:
 This is a one-time action. From then on the app opens normally from wherever you
 keep it.
 
-### Option 2: Swift Package Manager (Development)
+### Option 3: Swift Package Manager (Development)
 
 ```bash
 # Compile debug build
