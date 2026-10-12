@@ -299,7 +299,14 @@ private struct SeriesChart: View {
     .font(.caption2)
   }
 
-  private func legendItem(_ name: String, _ col: Color) -> some View {
+  private func lastValue(upTo date: Date? = nil, extractor: (Sample) -> Double?) -> Double? {
+    if let date {
+      return windowSamples.filter { $0.date <= date }.reversed().lazy.compactMap(extractor).first
+    }
+    return windowSamples.reversed().lazy.compactMap(extractor).first
+  }
+
+  private func legendItem(_ name: String, _ col: Color, value: Double? = nil) -> some View {
     HStack(spacing: 4) {
       Circle()
         .fill(col)
@@ -307,27 +314,56 @@ private struct SeriesChart: View {
       Text(name)
         .font(.caption2)
         .foregroundStyle(.secondary)
+      if let value {
+        Text(unit == "%" ? String(format: "%.0f%%", value) : String(format: "%.1f", value))
+          .font(.caption2.weight(.semibold))
+          .monospacedDigit()
+          .foregroundStyle(.primary)
+      }
     }
   }
 
   /// Readout for the scrub cursor, reporting values for all series at this chart's instant.
   private var scrubReadout: some View {
-    guard let d = hoverDate, let s = nearest(to: d) else {
+    guard let d = hoverDate else {
       return AnyView(EmptyView())
     }
-    let pv = value(s)
+    let pv: Double?
+    let evs: [(String, Color, Double?)]
+    if mode == .bars {
+      let bStart = bucketStart(for: d)
+      let bVal = points.first(where: { $0.series == primaryName && $0.date == bStart })?.value
+      pv = bVal ?? lastValue(upTo: d, extractor: value)
+      evs = extras.map { e in
+        let ebVal = points.first(where: { $0.series == e.name && $0.date == bStart })?.value
+        let val = ebVal ?? lastValue(upTo: d, extractor: e.value)
+        return (e.name, e.color, val)
+      }
+    } else {
+      guard let s = nearest(to: d) else { return AnyView(EmptyView()) }
+      pv = value(s) ?? lastValue(upTo: d, extractor: value)
+      evs = extras.map { e in
+        let val = e.value(s) ?? lastValue(upTo: d, extractor: e.value)
+        return (e.name, e.color, val)
+      }
+    }
     return AnyView(
       HStack(spacing: 8) {
         HStack(spacing: 3) {
           Circle().fill(color).frame(width: 5, height: 5)
-          Text(pv.map { String(format: "%.1f", $0) } ?? "—")
+          let formatted =
+            pv.map { unit == "%" ? String(format: "%.0f%%", $0) : String(format: "%.1f", $0) }
+            ?? "—"
+          Text("\(primaryName) \(formatted)")
             .font(.system(size: 10, weight: .semibold, design: .monospaced))
         }
-        ForEach(extras, id: \.name) { e in
-          let ev = e.value(s)
+        ForEach(evs, id: \.0) { name, col, val in
           HStack(spacing: 3) {
-            Circle().fill(e.color).frame(width: 5, height: 5)
-            Text(ev.map { String(format: "%.1f", $0) } ?? "—")
+            Circle().fill(col).frame(width: 5, height: 5)
+            let formatted =
+              val.map { unit == "%" ? String(format: "%.0f%%", $0) : String(format: "%.1f", $0) }
+              ?? "—"
+            Text("\(name) \(formatted)")
               .font(.system(size: 10, weight: .semibold, design: .monospaced))
           }
         }
@@ -425,26 +461,47 @@ private struct SeriesChart: View {
         RuleMark(x: .value("Mark", marker.date))
           .foregroundStyle(markerColor.opacity(0.75))
           .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 3]))
-          .annotation(position: .top, alignment: .center, spacing: 0) {
-            Image(systemName: "arrowtriangle.down.fill")
-              .font(.system(size: 7))
+          .annotation(position: .bottom, alignment: .center, spacing: 18) {
+            Image(systemName: "arrowtriangle.up.fill")
+              .font(.system(size: 6))
               .foregroundStyle(markerColor)
           }
           .annotation(
-            position: .top, alignment: .center, spacing: 5,
+            position: .bottom, alignment: .center, spacing: 23,
             overflowResolution: .init(x: .fit(to: .chart), y: .disabled)
           ) {
-            HStack(spacing: 3) {
+            let (icon, text): (String, String) = {
               if marker.label.starts(with: "Thermal") {
-                Image(systemName: "flame.fill")
-                  .font(.system(size: 7))
-                  .foregroundStyle(markerColor)
+                let state: String
+                if let arrow = marker.label.range(of: "→ ") {
+                  state = String(marker.label[arrow.upperBound...]).trimmingCharacters(
+                    in: .whitespaces)
+                } else if let colon = marker.label.firstIndex(of: ":") {
+                  let after = marker.label.index(after: colon)
+                  state = String(marker.label[after...]).trimmingCharacters(in: .whitespaces)
+                } else {
+                  state = marker.label
+                }
+                return ("flame.fill", state)
               } else if marker.label.starts(with: "Power") {
-                Image(systemName: "bolt.fill")
+                let mode: String
+                if let colon = marker.label.firstIndex(of: ":") {
+                  let after = marker.label.index(after: colon)
+                  mode = String(marker.label[after...]).trimmingCharacters(in: .whitespaces)
+                } else {
+                  mode = marker.label
+                }
+                return ("bolt.fill", mode)
+              }
+              return ("", marker.label)
+            }()
+            HStack(spacing: 3) {
+              if !icon.isEmpty {
+                Image(systemName: icon)
                   .font(.system(size: 7))
                   .foregroundStyle(markerColor)
               }
-              Text(marker.label)
+              Text(text)
                 .font(.system(size: 8, weight: .semibold, design: .monospaced))
                 .foregroundStyle(.primary)
             }
@@ -486,8 +543,9 @@ private struct SeriesChart: View {
     }
     .chartYScale(domain: 0...yUpper)
     .chartOverlay { _ in scrubOverlay }
-    .padding(.top, 16)
-    .frame(height: 114)
+    .padding(.top, 4)
+    .padding(.bottom, 22)
+    .frame(height: 136)
 
     if let domain = plotDomain {
       return AnyView(chart.chartXScale(domain: domain))
@@ -509,9 +567,9 @@ private struct SeriesChart: View {
           scrubReadout
         } else if !extras.isEmpty {
           HStack(spacing: 8) {
-            legendItem(primaryName, color)
+            legendItem(primaryName, color, value: lastValue(extractor: value))
             ForEach(extras, id: \.name) { e in
-              legendItem(e.name, e.color)
+              legendItem(e.name, e.color, value: lastValue(extractor: e.value))
             }
           }
           .lineLimit(1)
@@ -962,53 +1020,53 @@ struct DashboardView: View {
             name: "batch peak", color: .orange,
             value: { $0.decodeTps })
         ],
+        yMinFloor: 50.0,
         window: window,
         mode: .bars
       )
       SeriesChart(
-        title: "Prefill time (TTFT)", unit: "s",
+        title: "Prefill throughput", unit: "tok/s",
         samples: stats.samples, markers: stats.markers,
-        value: { $0.ttftP50Ms.map { $0 / 1000 } }, color: .purple,
-        primaryName: "p50",
+        value: { $0.prefillTps }, color: .purple,
+        primaryName: "sustained",
         hoverDate: $hoverDate,
         extras: [
           SeriesChart.Extra(
-            name: "p95", color: .pink,
-            value: { $0.ttftP95Ms.map { $0 / 1000 } })
+            name: "batch peak", color: .pink,
+            value: { $0.prefillBatchTps })
         ],
-        yMinFloor: 1.0,
-        window: window
+        yMinFloor: 100.0,
+        window: window,
+        mode: .bars
       )
       HStack(spacing: 12) {
         SeriesChart(
-          title: "Memory", unit: "GiB",
+          title: "Hardware load", unit: "%",
           samples: stats.samples, markers: stats.markers,
-          // Line 1 — everything the served model occupies: weights, KV
-          // cache, state cache and runtime, in one number.
-          value: { $0.metalBytes.map { Double($0) / 1_073_741_824 } }, color: .teal,
-          primaryName: "splash (model)",
+          value: { $0.gpuUtilization }, color: .blue,
+          primaryName: "GPU",
           hoverDate: $hoverDate,
-          // Line 2 — the whole machine's usage.
           extras: [
             SeriesChart.Extra(
-              name: "system in use", color: .indigo,
-              value: {
-                $0.totalLoadBytes.map { Double($0) / 1_073_741_824 }
-              })
+              name: "ANE", color: .purple,
+              value: { $0.aneUtilization })
           ],
-          yMax: stats.latest?.memoryPlan?.device?.physicalMemoryBytes
-            .map { Double($0) / 1_073_741_824 },
+          yMax: 100,
           desiredTicks: 3,
           window: window
         )
-        let pageTokens = stats.latest?.kv?.blockTokens ?? 32
         SeriesChart(
-          title: "KV pages", unit: "pages · \(pageTokens) tok/page",
+          title: "KV context cache", unit: "K tokens",
           samples: stats.samples, markers: stats.markers,
-          value: { $0.kvPagesActive.map(Double.init) }, color: .teal,
+          value: { $0.kvActiveTokens.map { Double($0) / 1000.0 } }, color: .teal,
           primaryName: "active",
           hoverDate: $hoverDate,
-          yMinFloor: 100,
+          extras: [
+            SeriesChart.Extra(
+              name: "pool", color: .indigo,
+              value: { $0.kvPoolTokens.map { Double($0) / 1000.0 } })
+          ],
+          yMinFloor: 32.0,
           desiredTicks: 3,
           window: window
         )

@@ -25,6 +25,8 @@ struct Sample: Identifiable {
   var sustainedTps: Double?
   /// Engine prefill rate over the interval: Δprefill_tokens / Δprefill_wall. Nil when idle.
   var prefillTps: Double?
+  /// Instantaneous batch prefill rate reported by the engine's current prefill batch.
+  var prefillBatchTps: Double?
   /// Server-side rolling-window percentiles (last 4096 samples).
   var ttftP50Ms: Double?
   var ttftP95Ms: Double?
@@ -42,12 +44,18 @@ struct Sample: Identifiable {
   /// file cache was 6,8 GiB and the rest headroom macOS holds compressed for
   /// the price of 0,9 GiB.
   ///
-  /// The two series `totalLoadBytes + hostAvailableBytes` sum to physical
-  /// exactly, which is the property that makes the chart reconcilable with the
-  /// machine it is describing.
+  /// Total system memory in use (lower bound: physical - host_available).
   var totalLoadBytes: UInt64?
+  /// Instantaneous GPU hardware utilization percentage (0–100%).
+  var gpuUtilization: Double?
+  /// Instantaneous Apple Neural Engine hardware utilization percentage (0–100%).
+  var aneUtilization: Double?
   var kvPagesActive: Int?
   var kvBlockTokens: Int?
+  var kvActiveTokens: Int? {
+    guard let p = kvPagesActive else { return nil }
+    return p * (kvBlockTokens ?? 32)
+  }
   var hostAvailableBytes: UInt64?
   var ttftSamples: Int?
   var pressure: String?
@@ -356,7 +364,14 @@ final class StatsModel: ObservableObject {
     if let data = try? Data(contentsOf: markersURL),
       let saved = try? JSONDecoder().decode([Marker].self, from: data)
     {
-      markers = saved
+      markers = saved.map { m in
+        if m.label.starts(with: "Thermal:"), let arrow = m.label.range(of: "→ ") {
+          return Marker(
+            id: m.id, date: m.date, label: "Thermal: " + m.label[arrow.upperBound...],
+            automatic: m.automatic, severity: m.severity)
+        }
+        return m
+      }
     }
   }
 
@@ -380,15 +395,16 @@ final class StatsModel: ObservableObject {
 
     if let currentThermal = status.thermalState, !currentThermal.isEmpty {
       if let previousThermal = lastThermalState, currentThermal != previousThermal {
-        let label = "Thermal: \(previousThermal) → \(currentThermal)"
+        let label = "Thermal: \(currentThermal)"
         let severity: Marker.Severity
         switch currentThermal {
         case "serious", "critical": severity = .critical
         case "fair": severity = .warn
         default: severity = .info
         }
-        if let last = markers.last, last.label == label, now.timeIntervalSince(last.date) < 60 {
-          // flap suppression
+        let lastThermal = markers.last { $0.label.starts(with: "Thermal") }
+        if let last = lastThermal, now.timeIntervalSince(last.date) < 60 {
+          // flap suppression: ignore thermal oscillations within 60s
         } else {
           addMarker(label: label, automatic: true, severity: severity)
         }
@@ -439,6 +455,17 @@ final class StatsModel: ObservableObject {
       sample.prefillTps = Double(pt - qpt) / (pw - qpw) * 1000
     }
 
+    if let batch = m?.currentPrefillBatch, batch.valid == true,
+      let rate = batch.tokensPerSecond, rate > 0
+    {
+      if sample.prefillTps != nil
+        || (m?.currentPrefillBatch != prev?.metrics?.currentPrefillBatch
+          && (status.scheduler?.prefilling ?? 0) > 0)
+      {
+        sample.prefillBatchTps = rate
+      }
+    }
+
     // Sustained decode, by the same delta-of-cumulative-counters construction as
     // prefill above. Independent of the batch reading, so it stays smooth
     // while `decodeTps` swings on draft acceptance.
@@ -475,6 +502,8 @@ final class StatsModel: ObservableObject {
     sample.activeRequests = status.scheduler?.decoding
     sample.deviceName = status.memoryPlan?.device?.deviceName
     sample.familyName = status.memoryPlan?.model?.modelName
+    sample.gpuUtilization = HardwareTelemetry.shared.sampleGPU()
+    sample.aneUtilization = HardwareTelemetry.shared.sampleANE()
     sample.maxContextTokens = status.maximumContextTokens
     sample.nativeContextTokens = status.memoryPlan?.maximumContextTokens
     if let p = status.kv?.pagesResident, let bt = status.kv?.blockTokens {
