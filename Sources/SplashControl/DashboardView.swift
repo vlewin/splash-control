@@ -188,7 +188,7 @@ private struct SeriesChart: View {
   }
 
   private var barWidth: CGFloat {
-    guard let domain = plotDomain else { return 6.0 }
+    guard let domain = xDomain else { return 6.0 }
     let span = max(bucketDuration, domain.upperBound.timeIntervalSince(domain.lowerBound))
     let visibleSlots = max(1.0, span / bucketDuration)
     let slotWidth = 740.0 / visibleSlots
@@ -259,15 +259,7 @@ private struct SeriesChart: View {
 
   private var barPadding: TimeInterval {
     guard mode == .bars else { return 1 }
-    let dates =
-      visiblePoints
-      .filter { $0.series == primaryName }
-      .map(\.date)
-    guard dates.count > 1 else { return bucketDuration }
-    let intervals = zip(dates, dates.dropFirst())
-      .map { $1.timeIntervalSince($0) }
-      .filter { $0 > 0 }
-    return intervals.min() ?? bucketDuration
+    return bucketDuration
   }
 
   private var plotDomain: ClosedRange<Date>? {
@@ -410,15 +402,18 @@ private struct SeriesChart: View {
   }
 
   private var styledChart: some View {
+    let currentPoints = visiblePoints
+    let currentBarWidth = barWidth
+    let domain = plotDomain ?? .distantPast ... .distantFuture
     let chart = Chart {
       if mode == .bars {
-        ForEach(visiblePoints) { point in
+        ForEach(currentPoints) { point in
           if let pv = point.value {
             if extras.isEmpty {
               BarMark(
                 x: .value("Time", barDate(for: point)),
                 y: .value(unit, pv),
-                width: .fixed(barWidth)
+                width: .fixed(currentBarWidth)
               )
               .foregroundStyle(color.opacity(0.85))
               .cornerRadius(2)
@@ -426,7 +421,7 @@ private struct SeriesChart: View {
               BarMark(
                 x: .value("Time", barDate(for: point)),
                 y: .value(unit, pv),
-                width: .fixed(barWidth)
+                width: .fixed(currentBarWidth)
               )
               .foregroundStyle(by: .value("Series", point.series))
               .cornerRadius(1.5)
@@ -434,7 +429,7 @@ private struct SeriesChart: View {
           }
         }
       } else {
-        ForEach(visiblePoints) { point in
+        ForEach(currentPoints) { point in
           if let pv = point.value {
             LineMark(
               x: .value("Time", point.date),
@@ -446,7 +441,6 @@ private struct SeriesChart: View {
           }
         }
       }
-      let domain = plotDomain ?? .distantPast ... .distantFuture
       ForEach(markers.filter { domain.lowerBound <= $0.date && $0.date <= domain.upperBound }) {
         marker in
         let markerColor: Color = {
