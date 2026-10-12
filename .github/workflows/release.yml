@@ -1,5 +1,9 @@
 name: Release
 
+concurrency:
+  group: release-main
+  cancel-in-progress: true
+
 on:
   push:
     branches:
@@ -101,13 +105,29 @@ jobs:
           brew audit --strict vlewin/tap/splash-control
           git -C "$TAPDIR" config user.name "github-actions[bot]"
           git -C "$TAPDIR" config user.email "github-actions[bot]@users.noreply.github.com"
+          git -C "$TAPDIR" remote set-url origin "https://x-access-token:${TAP_TOKEN}@github.com/vlewin/tap.git"
+          git -C "$TAPDIR" fetch origin main
+          git -C "$TAPDIR" checkout -B main origin/main 2>/dev/null || true
           git -C "$TAPDIR" add Casks/splash-control.rb
           if git -C "$TAPDIR" diff --cached --quiet; then
             echo "Cask already at ${{ steps.tag_version.outputs.new_tag }}; nothing to push."
           else
             git -C "$TAPDIR" commit -m "splash-control: ${{ steps.tag_version.outputs.new_tag }}"
-            git -C "$TAPDIR" remote set-url origin "https://x-access-token:${TAP_TOKEN}@github.com/vlewin/tap.git"
-            git -C "$TAPDIR" push origin HEAD:main
+            # Pull with rebase to ensure clean linear history, then push with retry
+            pushed=false
+            for attempt in 1 2 3; do
+              if git -C "$TAPDIR" pull --rebase origin main && git -C "$TAPDIR" push origin HEAD:main; then
+                echo "Successfully pushed cask to vlewin/tap."
+                pushed=true
+                break
+              fi
+              echo "Push rejected (attempt $attempt/3); retrying in 3s..."
+              sleep 3
+            done
+            if [[ "$pushed" != "true" ]]; then
+              echo "Failed to push cask to vlewin/tap after 3 attempts." >&2
+              exit 1
+            fi
           fi
         env:
           TAP_TOKEN: ${{ secrets.TAP_TOKEN }}
