@@ -44,3 +44,41 @@ func aneLabelFormats() throws {
   #expect(try BenchmarkEngine.aneLabel(decode(#"{"state":"stopped"}"#)) == "stopped")
   #expect(try BenchmarkEngine.aneLabel(decode("{}")) == "unreported")
 }
+
+@Test("plan: when selected is nil, all installed are used and current goes last")
+func planDefaultAllInstalledCurrentLast() {
+  let installed = ["modelA", "modelB", "modelC"]
+  let plan = BenchmarkEngine.plan(installed: installed, selected: nil, current: "modelB")
+  #expect(plan == ["modelA", "modelC", "modelB"])
+}
+
+@Test("plan: when current is not in installed, installed order is preserved")
+func planCurrentNotInInstalled() {
+  let installed = ["modelA", "modelB"]
+  let plan = BenchmarkEngine.plan(installed: installed, selected: nil, current: "modelC")
+  #expect(plan == ["modelA", "modelB"])
+}
+
+@Test("plan: selective models with current among selected puts current last")
+func planSelectiveWithCurrent() {
+  let installed = ["modelA", "modelB", "modelC"]
+  let selected: Set<String> = ["modelA", "modelB"]
+  let plan = BenchmarkEngine.plan(installed: installed, selected: selected, current: "modelA")
+  #expect(plan == ["modelB", "modelA"])
+}
+
+@Test("plan: selective single model not currently serving runs single model")
+func planSelectiveSingleModelDifferentFromCurrent() {
+  let installed = ["modelA", "modelB", "modelC"]
+  let selected: Set<String> = ["modelA"]
+  let plan = BenchmarkEngine.plan(installed: installed, selected: selected, current: "modelB")
+  #expect(plan == ["modelA"])
+}
+
+@Test("plan: selective single model matching current runs single model")
+func planSelectiveSingleModelMatchingCurrent() {
+  let installed = ["modelA", "modelB", "modelC"]
+  let selected: Set<String> = ["modelB"]
+  let plan = BenchmarkEngine.plan(installed: installed, selected: selected, current: "modelB")
+  #expect(plan == ["modelB"])
+}

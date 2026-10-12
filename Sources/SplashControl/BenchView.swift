@@ -18,7 +18,7 @@ struct BenchSection: View {
     VStack(alignment: .leading, spacing: 16) {
       head
       configCard
-      if !bench.plan.isEmpty { planCard }
+      if !ModelCatalog.installed().isEmpty || !bench.plan.isEmpty { planCard }
       if !bench.results.isEmpty {
         comparison
         resultsCard
@@ -36,9 +36,11 @@ struct BenchSection: View {
     }
     // Only the results block swaps, and only between two fixed-size states.
     .animation(.easeInOut(duration: 0.2), value: bench.results.isEmpty)
-    // Re-point the ANE picker at the saved value each time the tab is opened:
-    // the bench never writes the toggle, but a Settings flip can outdate it.
-    .onAppear { bench.syncAneEnabled() }
+    // Re-point the ANE picker at the saved value and sync available models each time the tab is opened.
+    .onAppear {
+      bench.syncAneEnabled()
+      bench.syncAvailableModels()
+    }
   }
 
   private var head: some View {
@@ -256,7 +258,10 @@ struct BenchSection: View {
         .buttonStyle(.borderedProminent)
         .tint(bench.phase == .idle || bench.phase == .done ? .blue : .red)
         .controlSize(.regular)
-        .disabled(bench.isExternal)
+        .disabled(
+          bench.isExternal
+            || ((bench.phase == .idle || bench.phase == .done) && bench.selectedModels.isEmpty)
+        )
         .frame(maxWidth: .infinity, alignment: .trailing)
       }
 
@@ -337,52 +342,78 @@ struct BenchSection: View {
   }
 
   private var planCard: some View {
-    HStack(spacing: 8) {
-      Text("EXECUTION ORDER:")
+    let isRunning = bench.phase != .idle && bench.phase != .done
+    return HStack(spacing: 8) {
+      Text("SELECTED MODELS:")
         .font(.system(size: 10, weight: .bold))
         .foregroundStyle(.secondary)
 
-      // One step per model rather than a flat "1 · name  2 · name" line:
-      // the run is sequential, so the row should show which model is in
-      // flight and not only what the order is.
-      ForEach(Array(bench.plan.enumerated()), id: \.element) { idx, model in
-        let status = runStatus(for: model)
-        HStack(spacing: 4) {
-          switch status {
-          case .completed:
-            Image(systemName: "checkmark.circle.fill")
-              .font(.system(size: 11))
-              .foregroundStyle(.green)
-          case .active:
-            ProgressView()
-              .controlSize(.mini)
-          case .queued, .none:
-            Text("\(idx + 1)")
-              .font(.system(size: 10, weight: .bold, design: .monospaced))
-              .foregroundStyle(.tertiary)
-          }
-          Text(ModelCatalog.displayName(for: model))
-            .font(.system(size: 11, design: .monospaced))
-            .fontWeight(status.isActive ? .bold : .regular)
-            .foregroundStyle(
-              status == .completed
-                ? Color.secondary.opacity(0.8)
-                : (status.isActive ? Color.primary : Color.secondary.opacity(0.55))
-            )
-            .lineLimit(1)
-          if case .active(let done) = status {
-            Text("(\(done)/\(bench.scenarioCount))")
-              .font(.system(size: 10, design: .monospaced))
-              .foregroundStyle(.blue)
+      if isRunning {
+        // One step per model rather than a flat "1 · name  2 · name" line:
+        // the run is sequential, so the row should show which model is in
+        // flight and not only what the order is.
+        ForEach(Array(bench.plan.enumerated()), id: \.element) { idx, model in
+          let status = runStatus(for: model)
+          HStack(spacing: 4) {
+            switch status {
+            case .completed:
+              Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 11))
+                .foregroundStyle(.green)
+            case .active:
+              ProgressView()
+                .controlSize(.mini)
+            case .queued, .none:
+              Text("\(idx + 1)")
+                .font(.system(size: 10, weight: .bold, design: .monospaced))
+                .foregroundStyle(.tertiary)
+            }
+            Text(ModelCatalog.displayName(for: model))
+              .font(.system(size: 11, design: .monospaced))
+              .fontWeight(status.isActive ? .bold : .regular)
+              .foregroundStyle(
+                status == .completed
+                  ? Color.secondary.opacity(0.8)
+                  : (status.isActive ? Color.primary : Color.secondary.opacity(0.55))
+              )
               .lineLimit(1)
+            if case .active(let done) = status {
+              Text("(\(done)/\(bench.scenarioCount))")
+                .font(.system(size: 10, design: .monospaced))
+                .foregroundStyle(.blue)
+                .lineLimit(1)
+            }
+          }
+          .fixedSize()
+
+          if idx < bench.plan.count - 1 {
+            Image(systemName: "arrow.right")
+              .font(.system(size: 8))
+              .foregroundStyle(.quaternary)
           }
         }
-        .fixedSize()
-
-        if idx < bench.plan.count - 1 {
-          Image(systemName: "arrow.right")
-            .font(.system(size: 8))
-            .foregroundStyle(.quaternary)
+      } else {
+        let installed = ModelCatalog.installed()
+        ForEach(installed, id: \.self) { model in
+          let isSelected = bench.selectedModels.contains(model)
+          Button {
+            if isSelected {
+              bench.selectedModels.remove(model)
+            } else {
+              bench.selectedModels.insert(model)
+            }
+          } label: {
+            HStack(spacing: 4) {
+              Image(systemName: isSelected ? "checkmark.square.fill" : "square")
+                .font(.system(size: 11))
+                .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
+              Text(ModelCatalog.displayName(for: model))
+                .font(.system(size: 11, design: .monospaced))
+                .foregroundStyle(isSelected ? Color.primary : Color.secondary.opacity(0.6))
+            }
+          }
+          .buttonStyle(.plain)
+          .fixedSize()
         }
       }
     }

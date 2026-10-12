@@ -2185,6 +2185,7 @@ swiftc -O -o "$work/check" \
   Sources/SplashControl/LogsView.swift \
   Sources/SplashControl/ContentHeight.swift \
   Sources/SplashControl/SettingsView.swift \
+  Sources/SplashControl/HardwareTelemetry.swift \
   Sources/SplashControl/StatsModel.swift \
   Sources/SplashControl/ModelBenchmark.swift \
   Sources/SplashControl/SplashLog.swift \
