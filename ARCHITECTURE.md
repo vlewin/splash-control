@@ -23,6 +23,7 @@ There is **no backend of our own.** The splash server is the system under observ
 - `StatusDTO` is a **mirror of the server schema**, not our domain model. Conversions into display models happen in `StatsModel`/views.
 - Dynamic auto-fit content height: tabs report inner height via `ContentHeightKey`, clamped to minimum 380pt.
 - **Subprocess isolation from the render path (BUG-17):** never run synchronous subprocesses (`Process.waitUntilExit()` via `runTool`, e.g. `lsof`/`netstat`) inside a SwiftUI view body, helper, or computed getter — `waitUntilExit()` pumps the runloop and re-enters SwiftUI rendering (fatal `EXC_BAD_ACCESS`). Probe results live in `@Published` properties refreshed asynchronously by the poll loop.
+- **Chart and render-loop performance (BUG-18 / CPU guard):** never evaluate O(N) bucketing (`chartPoints`), point filtering (`visiblePoints`), or dynamic geometry (`barWidth`, `plotDomain`, `barPadding`) inside chart mark closures (`ForEach`) or per-mark accessors. Hoist all visible points, bar dimensions, and domain bounds once before the `Chart` builder. For bar charts, `barPadding` is strictly `bucketDuration` and `barWidth` is computed directly from `xDomain` without re-walking data points.
 
 ---
 

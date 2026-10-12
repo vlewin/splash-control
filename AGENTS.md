@@ -115,6 +115,7 @@ This section accumulates concrete corrections. When corrected on your approach, 
 - *Learnings log*:
   - Never commit or push without explicit user approval — stage, show the diff and proposed message, wait for confirmation.
   - Never start a shell-command line with `=` (`===` separators) — zsh expands a leading `=` to a command path; use `---` instead.
+  - Never evaluate O(N) bucketing or geometry inside Chart/ForEach mark closures — hoist once before the builder.
 - *Rotation / prune test*: keep this log to ≤ 10 entries (fold durable rules into their section when it exceeds); every few weeks, delete any line whose removal would cause no mistake.
 - *Size budget*: ≤ ~320 lines / ≤ 20 KB — 2026 guidance (vLLM caps at 200/300 lines, Codex truncates at 32 KiB). New detail goes to a reference doc, not here.
 
