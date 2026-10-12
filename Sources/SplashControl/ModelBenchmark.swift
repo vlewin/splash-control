@@ -516,6 +516,8 @@ final class BenchmarkEngine: ObservableObject {
   /// Which stored run is on screen. `finishedAt` is the selection token: it is
   /// unique per run and needs no separate index.
   @Published private(set) var selectedRunAt: Date?
+  /// Set of installed model IDs chosen to run in the benchmark.
+  @Published var selectedModels: Set<String> = []
 
   private let config: ConfigStore
   private let process: SplashProcess
@@ -531,6 +533,9 @@ final class BenchmarkEngine: ObservableObject {
   /// stored with the results, because "which power mode was this measured under"
   /// is part of what makes a throughput number mean something.
   private var runPowerMode = "unknown"
+  /// The active serving model before the benchmark was started, remembered so
+  /// it can be restored if it was not the last model in the benchmark run.
+  private var originalServingModel: String?
   /// The `--max-context` a run replaced, or nil when it replaced nothing. nil
   /// is the common case: only a scenario bigger than the configured cap
   /// provisions one, so a 32K/64K/128K run leaves the server exactly as it
@@ -555,6 +560,18 @@ final class BenchmarkEngine: ObservableObject {
     let archive = BenchArchive.load()
     runs = archive.runs
     if let latest = archive.latest { load(latest) }
+    syncAvailableModels()
+  }
+
+  /// Synchronizes selectedModels against the currently installed models in ModelCatalog.
+  func syncAvailableModels() {
+    let installed = ModelCatalog.installed()
+    if selectedModels.isEmpty {
+      selectedModels = Set(installed)
+    } else {
+      let filtered = selectedModels.intersection(Set(installed))
+      selectedModels = filtered.isEmpty ? Set(installed) : filtered
+    }
   }
 
   /// Puts a stored run on screen. Shared by the launch path and the picker, so
@@ -721,17 +738,26 @@ final class BenchmarkEngine: ObservableObject {
   private func buildPlan() -> [String] {
     BenchmarkEngine.plan(
       installed: ModelCatalog.installed(),
+      selected: selectedModels,
       current: stats.latest?.instance?.model ?? config.config.model)
   }
 
   /// Pure so the ordering rule is testable without a live server. The model in
   /// service goes last, so the run ends on it and no restore step is needed.
-  nonisolated static func plan(installed: [String], current: String?) -> [String] {
-    guard let current, installed.contains(current) else { return installed }
-    return installed.filter { $0 != current } + [current]
+  /// If selected is specified, only installed models in selected are included.
+  nonisolated static func plan(
+    installed: [String],
+    selected: Set<String>? = nil,
+    current: String?
+  ) -> [String] {
+    let pool = selected.map { s in installed.filter { s.contains($0) } } ?? installed
+    guard let current, pool.contains(current) else { return pool }
+    return pool.filter { $0 != current } + [current]
   }
 
-  var canRun: Bool { (phase == .idle || phase == .done) && !isExternal }
+  var canRun: Bool {
+    (phase == .idle || phase == .done) && !isExternal && !selectedModels.isEmpty
+  }
 
   /// The bench switches models through the tray's own `hardRestart`, which
   /// deliberately refuses to substitute a model for a server the tray does not
@@ -777,6 +803,8 @@ final class BenchmarkEngine: ObservableObject {
     aneStates = [:]
     lastRunAt = nil
     cancelled = false
+    // Remember the active model before running so it can be restored if needed.
+    originalServingModel = stats.latest?.instance?.model ?? config.config.model
     // Real requests, synthetic prompts: keep them out of the serving history.
     history.isSuppressed = true
     let plan = buildPlan()
@@ -898,6 +926,18 @@ final class BenchmarkEngine: ObservableObject {
     }
   }
 
+  /// Restores the original serving model if the benchmark finished or was cancelled
+  /// on a model different from the one that was serving before the benchmark started.
+  private func restoreServingModelIfNeeded() async {
+    guard let orig = originalServingModel else { return }
+    originalServingModel = nil
+    let currentServing = stats.latest?.instance?.model ?? config.config.model
+    guard currentServing != orig else { return }
+    config.config.model = orig
+    SplashLog.shared.log("bench_serving_model_restored to=\(orig)")
+    await process.hardRestart(serving: orig, force: true)
+  }
+
   func cancel() {
     cancelled = true
     task?.cancel()
@@ -905,6 +945,7 @@ final class BenchmarkEngine: ObservableObject {
     saveReport()
     if case .failed = phase {} else { phase = .idle }
     Task { [weak self] in
+      await self?.restoreServingModelIfNeeded()
       await self?.restoreContextIfNeeded()
       await self?.restoreAneIfNeeded()
     }
@@ -966,6 +1007,8 @@ final class BenchmarkEngine: ObservableObject {
     }
     saveReport()
     phase = .done
+    // Restore the user's active serving model if it was not the last model in the benchmark run.
+    await restoreServingModelIfNeeded()
     // Back to the configured cap, with a re-spawn so it is the running cap
     // and not just the saved one. The engine stays on the last plan model,
     // which `buildPlan` put there on purpose.
