@@ -139,10 +139,10 @@ enum ModelCatalog {
   }
 
   /// Menu/Picker label for a model ID: drop the owner, drop a packaging
-  /// suffix the two `incoai` releases and Prism's GGUF repo both carry, and
+  /// suffix the two official releases and Prism's GGUF repo both carry, and
   /// surface a GGUF variant separately since it selects a different file.
   ///
-  ///     incoai/Qwen3.8-27B-Splash                 -> "Qwen 3.8 27B"
+  ///     mlx-community/Qwen3.8-27B-4bit           -> "Qwen 3.8 27B 4bit"
   ///     prism-ml/Ternary-Bonsai-2-27B-gguf:PQ2_0  -> "Ternary Bonsai 2 27B · PQ2_0"
   ///
   /// Deliberately derived, not a lookup table: a table is what silently

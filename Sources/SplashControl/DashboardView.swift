@@ -413,31 +413,52 @@ private struct SeriesChart: View {
       let domain = plotDomain ?? .distantPast ... .distantFuture
       ForEach(markers.filter { domain.lowerBound <= $0.date && $0.date <= domain.upperBound }) {
         marker in
+        let markerColor: Color = {
+          switch marker.severity {
+          case .critical: return .red
+          case .warn: return .orange
+          default:
+            return marker.label.starts(with: "Thermal") ? .orange : .blue
+          }
+        }()
+
         RuleMark(x: .value("Mark", marker.date))
-          .foregroundStyle(.secondary.opacity(0.6))
+          .foregroundStyle(markerColor.opacity(0.75))
           .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 3]))
           .annotation(position: .top, alignment: .center, spacing: 0) {
             Image(systemName: "arrowtriangle.down.fill")
-              .font(.system(size: 6))
-              .foregroundStyle(Color.secondary.opacity(0.85))
+              .font(.system(size: 7))
+              .foregroundStyle(markerColor)
           }
           .annotation(
-            position: .top, alignment: .center, spacing: 6,
+            position: .top, alignment: .center, spacing: 5,
             overflowResolution: .init(x: .fit(to: .chart), y: .disabled)
           ) {
-            Text(marker.label)
-              .font(.system(size: 8, weight: .semibold))
-              .foregroundStyle(.primary.opacity(0.85))
-              .padding(.horizontal, 5)
-              .padding(.vertical, 2)
-              .background(
-                RoundedRectangle(cornerRadius: 3)
-                  .fill(Color(nsColor: .controlBackgroundColor))
-              )
-              .overlay(
-                RoundedRectangle(cornerRadius: 3)
-                  .strokeBorder(Color.secondary.opacity(0.35), lineWidth: 0.5)
-              )
+            HStack(spacing: 3) {
+              if marker.label.starts(with: "Thermal") {
+                Image(systemName: "flame.fill")
+                  .font(.system(size: 7))
+                  .foregroundStyle(markerColor)
+              } else if marker.label.starts(with: "Power") {
+                Image(systemName: "bolt.fill")
+                  .font(.system(size: 7))
+                  .foregroundStyle(markerColor)
+              }
+              Text(marker.label)
+                .font(.system(size: 8, weight: .semibold, design: .monospaced))
+                .foregroundStyle(.primary)
+            }
+            .padding(.horizontal, 5)
+            .padding(.vertical, 2)
+            .background(
+              RoundedRectangle(cornerRadius: 3)
+                .fill(Color(nsColor: .controlBackgroundColor))
+            )
+            .overlay(
+              RoundedRectangle(cornerRadius: 3)
+                .strokeBorder(markerColor.opacity(0.6), lineWidth: 1)
+            )
+            .shadow(color: Color.black.opacity(0.12), radius: 1, x: 0, y: 1)
           }
       }
       // The scrub rule, drawn last so it sits above the data.
@@ -894,6 +915,7 @@ struct DashboardView: View {
             .font(.title3.weight(.semibold))
           statusChip
           powerChip
+          thermalChip
         }
         Text("Rolling engine time series \u{b7} \(ModelCatalog.displayName(for: model))")
           .font(.caption)
@@ -1108,6 +1130,7 @@ struct DashboardView: View {
             .tint(.orange)
         }
         powerChip
+        thermalChip
         if let device = stats.latest?.memoryPlan?.device?.deviceName {
           chip(device, .cyan)
         }
@@ -1215,6 +1238,36 @@ struct DashboardView: View {
       .padding(.vertical, 3)
       .background(color.opacity(0.15), in: Capsule())
       .foregroundStyle(color)
+  }
+
+  @ViewBuilder
+  private var thermalChip: some View {
+    if let thermal = stats.latest?.thermalState, !thermal.isEmpty {
+      let (color, icon, isElevated): (Color, String, Bool) = {
+        switch thermal {
+        case "serious", "critical":
+          return (.red, "flame.fill", true)
+        case "fair":
+          return (.orange, "flame.fill", true)
+        default:
+          return (.secondary, "thermometer.medium", false)
+        }
+      }()
+
+      if isElevated {
+        HStack(spacing: 4) {
+          Image(systemName: icon)
+            .font(.system(size: 9))
+          Text(thermal.capitalized)
+            .font(.caption.weight(.medium))
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 3)
+        .background(color.opacity(0.15), in: Capsule())
+        .foregroundStyle(color)
+        .help("Thermal state: \(thermal.capitalized). GPU/CPU throttling may occur.")
+      }
+    }
   }
 
   /// Names the batch's draft acceptance, because that is the only visible cause

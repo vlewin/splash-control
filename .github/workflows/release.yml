@@ -92,10 +92,9 @@ jobs:
             echo "The next release will publish the cask automatically."
             exit 0
           fi
-          # Tap the real remote (public, so read needs no auth) and work
-          # inside its clone: a path-tapped dir does not resolve token
-          # audit in brew 7 ("No available formula or cask", v1.5.1).
-          brew tap vlewin/tap
+          # Tap the real remote repository explicitly using its URL (vlewin/tap,
+          # not vlewin/homebrew-tap) and work inside its clone.
+          brew tap vlewin/tap https://github.com/vlewin/tap
           TAPDIR="$(brew --repo vlewin/tap)"
           mkdir -p "$TAPDIR/Casks"
           cp "dist/SplashControl-${{ steps.tag_version.outputs.new_tag }}.cask" "$TAPDIR/Casks/splash-control.rb"
