@@ -353,6 +353,8 @@ final class StatsModel: ObservableObject {
   private var lastSampleDate: Date?
   private var lastPowerMode: Int?
   private var lastThermalState: String?
+  private var lastTurnPeakPages: Int?
+  private var currentTurnPeakPages: Int = 0
   private var markersURL: URL {
     let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
       .appendingPathComponent("SplashControl", isDirectory: true)
@@ -517,6 +519,45 @@ final class StatsModel: ObservableObject {
       if delta > 0.5 {
         sample.requestsPerMin = Double(ct - cpt) / delta * 60
       }
+    }
+
+    let currentActive = status.kv?.pagesActive ?? 0
+    if currentActive > 0 {
+      currentTurnPeakPages = max(currentTurnPeakPages, currentActive)
+    }
+
+    if let ct = status.requests?.completed, let cpt = prev?.requests?.completed, ct > cpt {
+      let completedTurnPeak = max(currentTurnPeakPages, prev?.kv?.pagesActive ?? 0)
+      if completedTurnPeak > 0 {
+        let prefillDelta: Double? = {
+          if let pw = m?.prefillWallMs, let qpw = prev?.metrics?.prefillWallMs, pw > qpw {
+            return Double(pw - qpw)
+          }
+          return nil
+        }()
+        let elapsed: Double? = lastSampleDate.map { now.timeIntervalSince($0) }
+        if let compactLabel = Self.evaluateCompactionDrop(
+          previousPages: lastTurnPeakPages,
+          previousBlockTokens: prev?.kv?.blockTokens ?? status.kv?.blockTokens,
+          currentPages: completedTurnPeak,
+          currentBlockTokens: status.kv?.blockTokens,
+          previousRequestsCompleted: cpt,
+          currentRequestsCompleted: ct,
+          previousRestarts: prev?.transport?.restarts,
+          currentRestarts: status.transport?.restarts,
+          weightsReleased: status.weights?.released,
+          statusStale: status.transport?.statusStale,
+          prefillDeltaMs: prefillDelta,
+          elapsedSec: elapsed
+        ) {
+          let lastCompact = markers.last { $0.label.starts(with: "Compact") }
+          if lastCompact == nil || now.timeIntervalSince(lastCompact!.date) >= 10 {
+            addMarker(label: compactLabel, automatic: true, severity: .warn)
+          }
+        }
+        lastTurnPeakPages = completedTurnPeak
+      }
+      currentTurnPeakPages = currentActive
     }
     sample.powerMode = powerMode
 
@@ -897,6 +938,49 @@ final class StatsModel: ObservableObject {
 
   static func autoScaleCeiling(observed: Double) -> Double {
     max(observed, 0.001) * autoScaleHeadroom
+  }
+
+  /// Evaluates whether a drop in active KV pages between two polls represents a
+  /// session context compaction event (issue #24). Pure, deterministic function.
+  nonisolated static func evaluateCompactionDrop(
+    previousPages: Int?, previousBlockTokens: Int?,
+    currentPages: Int?, currentBlockTokens: Int?,
+    previousRequestsCompleted: UInt64?, currentRequestsCompleted: UInt64?,
+    previousRestarts: Int?, currentRestarts: Int?,
+    weightsReleased: Bool?, statusStale: Bool?,
+    prefillDeltaMs: Double?, elapsedSec: Double?
+  ) -> String? {
+    guard let pPages = previousPages, let cPages = currentPages,
+      pPages > 0, cPages > 0
+    else { return nil }
+
+    let pTokens = pPages * (previousBlockTokens ?? 32)
+    let cTokens = cPages * (currentBlockTokens ?? 32)
+    guard pTokens > cTokens else { return nil }
+
+    let drop = pTokens - cTokens
+    let dropRatio = Double(drop) / Double(pTokens)
+
+    // Cliff drop threshold: at least 35% reduction and at least 8,192 tokens dropped
+    guard dropRatio >= 0.35 && drop >= 8_192 else { return nil }
+
+    // Confirming signals: requests.completed advanced (work happened)
+    guard let cReq = currentRequestsCompleted, let pReq = previousRequestsCompleted, cReq > pReq
+    else { return nil }
+
+    // Distinguishing signals: rule out server restarts, idle weight paging, and stale snapshots
+    guard previousRestarts == currentRestarts else { return nil }
+    guard weightsReleased != true else { return nil }
+    guard statusStale != true else { return nil }
+
+    let dropK = Double(drop) / 1000.0
+    if let ms = prefillDeltaMs, ms > 0 {
+      return String(format: "Compact: %.0fms (-%.0fK)", ms, dropK)
+    } else if let sec = elapsedSec, sec > 0 && sec < 10.0 {
+      return String(format: "Compact: %.1fs (-%.0fK)", sec, dropK)
+    } else {
+      return String(format: "Compact: -%.0fK", dropK)
+    }
   }
 
   // MARK: - Chart bucketing

@@ -448,7 +448,9 @@ private struct SeriesChart: View {
           case .critical: return .red
           case .warn: return .orange
           default:
-            return marker.label.starts(with: "Thermal") ? .orange : .blue
+            if marker.label.starts(with: "Thermal") { return .orange }
+            if marker.label.starts(with: "Compact") { return .orange }
+            return .blue
           }
         }()
 
@@ -464,52 +466,31 @@ private struct SeriesChart: View {
             position: .bottom, alignment: .center, spacing: 23,
             overflowResolution: .init(x: .fit(to: .chart), y: .disabled)
           ) {
-            let (icon, text): (String, String) = {
+            let icon: String = {
               if marker.label.starts(with: "Thermal") {
-                let state: String
-                if let arrow = marker.label.range(of: "→ ") {
-                  state = String(marker.label[arrow.upperBound...]).trimmingCharacters(
-                    in: .whitespaces)
-                } else if let colon = marker.label.firstIndex(of: ":") {
-                  let after = marker.label.index(after: colon)
-                  state = String(marker.label[after...]).trimmingCharacters(in: .whitespaces)
-                } else {
-                  state = marker.label
-                }
-                return ("flame.fill", state)
+                return "flame.fill"
               } else if marker.label.starts(with: "Power") {
-                let mode: String
-                if let colon = marker.label.firstIndex(of: ":") {
-                  let after = marker.label.index(after: colon)
-                  mode = String(marker.label[after...]).trimmingCharacters(in: .whitespaces)
-                } else {
-                  mode = marker.label
-                }
-                return ("bolt.fill", mode)
+                return "bolt.fill"
+              } else if marker.label.starts(with: "Compact") {
+                return "scissors"
               }
-              return ("", marker.label)
+              return "circle.fill"
             }()
-            HStack(spacing: 3) {
-              if !icon.isEmpty {
-                Image(systemName: icon)
-                  .font(.system(size: 7))
-                  .foregroundStyle(markerColor)
-              }
-              Text(text)
-                .font(.system(size: 8, weight: .semibold, design: .monospaced))
-                .foregroundStyle(.primary)
-            }
-            .padding(.horizontal, 5)
-            .padding(.vertical, 2)
-            .background(
-              RoundedRectangle(cornerRadius: 3)
-                .fill(Color(nsColor: .controlBackgroundColor))
-            )
-            .overlay(
-              RoundedRectangle(cornerRadius: 3)
-                .strokeBorder(markerColor.opacity(0.6), lineWidth: 1)
-            )
-            .shadow(color: Color.black.opacity(0.12), radius: 1, x: 0, y: 1)
+            Image(systemName: icon)
+              .font(.system(size: 7, weight: .semibold))
+              .foregroundStyle(markerColor)
+              .padding(.horizontal, 4)
+              .padding(.vertical, 2)
+              .background(
+                RoundedRectangle(cornerRadius: 3)
+                  .fill(Color(nsColor: .controlBackgroundColor))
+              )
+              .overlay(
+                RoundedRectangle(cornerRadius: 3)
+                  .strokeBorder(markerColor.opacity(0.6), lineWidth: 1)
+              )
+              .shadow(color: Color.black.opacity(0.12), radius: 1, x: 0, y: 1)
+              .help(marker.label)
           }
       }
       // The scrub rule, drawn last so it sits above the data.
