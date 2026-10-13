@@ -114,6 +114,16 @@ private struct SeriesChart: View {
   var desiredTicks: Int = 5
   /// Rolling window for the x-axis (the buffer may retain more).
   var window: TimeInterval = 60 * 60
+  /// Optional horizontal threshold rules (e.g. context ceiling)
+  var thresholdLines: [ThresholdLine] = []
+  struct ThresholdLine: Equatable {
+    let value: Double
+    let label: String
+    let color: Color
+    var position: AnnotationPosition = .bottom
+    var alignment: Alignment = .leading
+    var pinsMax: Bool = true
+  }
   /// Primary-series render mode: plain line or prominent bars.
   var mode: Mode = .line
 
@@ -275,9 +285,10 @@ private struct SeriesChart: View {
   private var yUpper: Double {
     if let yMax { return yMax }
     let top = visiblePoints.compactMap(\.value).max() ?? 0
-    if let yMinFloor { return max(top, yMinFloor) }
-    if mode != .bars { return max(top, 1.0) }
-    return StatsModel.autoScaleCeiling(observed: top)
+    let bound = max(top, thresholdLines.filter(\.pinsMax).map(\.value).max() ?? 0)
+    if let yMinFloor { return max(bound, yMinFloor) }
+    if mode != .bars { return max(bound, 1.0) }
+    return StatsModel.autoScaleCeiling(observed: bound)
   }
 
   private func statLabel(_ name: String, _ v: Double?) -> some View {
@@ -404,8 +415,29 @@ private struct SeriesChart: View {
   private var styledChart: some View {
     let currentPoints = visiblePoints
     let currentBarWidth = barWidth
+    let currentThresholds = thresholdLines
     let domain = plotDomain ?? .distantPast ... .distantFuture
     let chart = Chart {
+      ForEach(currentThresholds, id: \.label) { threshold in
+        RuleMark(y: .value("Threshold", threshold.value))
+          .foregroundStyle(threshold.color.opacity(0.85))
+          .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 3]))
+          .annotation(position: threshold.position, alignment: threshold.alignment, spacing: 2) {
+            Text(threshold.label)
+              .font(.system(size: 8, weight: .semibold, design: .monospaced))
+              .foregroundStyle(threshold.color)
+              .padding(.horizontal, 4)
+              .padding(.vertical, 1.5)
+              .background(
+                RoundedRectangle(cornerRadius: 3)
+                  .fill(Color(nsColor: .controlBackgroundColor).opacity(0.85))
+              )
+              .overlay(
+                RoundedRectangle(cornerRadius: 3)
+                  .strokeBorder(threshold.color.opacity(0.5), lineWidth: 0.5)
+              )
+          }
+      }
       if mode == .bars {
         ForEach(currentPoints) { point in
           if let pv = point.value {
@@ -1043,10 +1075,27 @@ struct DashboardView: View {
           ],
           yMinFloor: 32.0,
           desiredTicks: 3,
-          window: window
+          window: window,
+          thresholdLines: contextCeilingLines
         )
       }
     }
+  }
+
+  private var contextCeilingLines: [SeriesChart.ThresholdLine] {
+    guard let maxTok = stats.contextCap, maxTok > 0 else { return [] }
+    let capK = Double(maxTok) / 1000.0
+    let label = String(format: "cap %.0fK", Double(maxTok) / 1024.0)
+    return [
+      SeriesChart.ThresholdLine(
+        value: capK,
+        label: label,
+        color: Color.secondary.opacity(0.75),
+        position: .bottom,
+        alignment: .leading,
+        pinsMax: capK <= 140.0
+      )
+    ]
   }
 
   /// Compact age for a held reading: seconds while that is meaningful, then
