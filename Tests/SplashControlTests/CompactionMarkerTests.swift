@@ -111,3 +111,21 @@ func compactionDropRejectsOnStaleSnapshot() {
   #expect(label == nil)
 }
 
+@Test("activePrefillProgress computes token progress and fraction")
+func activePrefillProgressComputes() {
+  let p = StatsModel.PrefillProgress(processed: 4096, total: 16384)
+  #expect(p.fraction == 0.25)
+  #expect(p.percentText == "25%")
+}
+
+@Test("activePrefillProgress clamps safely")
+func activePrefillProgressClamps() {
+  let pZero = StatsModel.PrefillProgress(processed: 100, total: 0)
+  #expect(pZero.fraction == 0.0)
+  #expect(pZero.percentText == "0%")
+
+  let pOver = StatsModel.PrefillProgress(processed: 20000, total: 10000)
+  #expect(pOver.fraction == 1.0)
+  #expect(pOver.percentText == "100%")
+}
+

@@ -656,6 +656,28 @@ final class StatsModel: ObservableObject {
     return Date().timeIntervalSince(s.date)
   }
 
+  /// splash 1.3.2+: Progress info for any active prefill request in flight.
+  public struct PrefillProgress: Equatable {
+    public let processed: UInt64
+    public let total: UInt64
+    public var fraction: Double {
+      guard total > 0 else { return 0 }
+      return min(1.0, max(0.0, Double(processed) / Double(total)))
+    }
+    public var percentText: String {
+      String(format: "%.0f%%", fraction * 100)
+    }
+  }
+
+  /// Returns the prefill progress of the active in-flight prefill request, if any.
+  var activePrefillProgress: PrefillProgress? {
+    guard let reqs = latest?.activeRequests, !reqs.isEmpty else { return nil }
+    guard let prefillReq = reqs.first(where: { $0.phase == "prefill" }) else { return nil }
+    guard let total = prefillReq.promptTokens, total > 0 else { return nil }
+    let processed = prefillReq.promptProcessed ?? 0
+    return PrefillProgress(processed: processed, total: total)
+  }
+
   /// Sustained decode throughput, held rather than blanked. This is the hero
   /// figure because it is the one that means "how fast is this model
   /// generating" and the one comparable to the server's own log line.
