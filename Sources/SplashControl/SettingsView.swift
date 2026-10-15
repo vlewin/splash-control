@@ -25,6 +25,9 @@ struct SettingsView: View {
 
   @AppStorage("settings_subtab") private var subTab: SettingsSubTab = .server
   @State private var copiedEndpoint = false
+  @State private var isPurging = false
+  @State private var purgeFeedback: String?
+  private let client = SplashClient()
 
   // Effective server defaults, shown in inline placeholders.
   private let defMaxMemory = "58G"  // auto resolves to 58G on a 64 GiB Mac
@@ -408,6 +411,35 @@ struct SettingsView: View {
           .frame(width: 140, alignment: .trailing)
         }
 
+        // Purge Model Weights (On-demand POST /v1/memory/release, splash 1.3.2+)
+        let isServing = process.isActivelyServing(on: config.config.port)
+        let isReleased = stats.weightsReleased
+        formRow(
+          "Purge Model Weights",
+          isReleased
+            ? "Weights already released · unwired from RAM"
+            : (purgeFeedback ?? "Unwires model weights while keeping prefix KV cache"),
+          help:
+            "Immediately frees model weight RAM without restarting or losing cached prefixes. The next prompt transparently re-restores weights."
+        ) {
+          HStack(spacing: 8) {
+            if isPurging {
+              ProgressView()
+                .controlSize(.small)
+            }
+            Button {
+              purgeWeights()
+            } label: {
+              HStack(spacing: 4) {
+                Image(systemName: "arrow.down.to.line.compact")
+                Text(isReleased ? "Purged" : "Purge Now")
+              }
+            }
+            .disabled(!isServing || isReleased || isPurging)
+            .controlSize(.small)
+          }
+        }
+
         Divider().opacity(0.4)
 
         // Disk Cache Tier
@@ -470,6 +502,34 @@ struct SettingsView: View {
       return (configured.text, nil)
     }
     return ("Unload weights during inactivity · blank = 10m", nil)
+  }
+
+  private func purgeWeights() {
+    guard !isPurging else { return }
+    isPurging = true
+    let port = config.config.port
+    Task {
+      do {
+        let res = try await client.releaseMemory(port: port)
+        await MainActor.run {
+          isPurging = false
+          if res.released == true {
+            purgeFeedback = "Weights purged successfully"
+          } else {
+            purgeFeedback = "Weights already released"
+          }
+        }
+      } catch {
+        await MainActor.run {
+          isPurging = false
+          purgeFeedback = error.localizedDescription
+        }
+      }
+      try? await Task.sleep(for: .seconds(3))
+      await MainActor.run {
+        purgeFeedback = nil
+      }
+    }
   }
 
   // MARK: - Sub-Tab 2: App Behavior

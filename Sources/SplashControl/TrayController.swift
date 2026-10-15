@@ -268,6 +268,11 @@ final class TrayController: NSObject, NSMenuDelegate {
       stopItem.title = "Stop Server"
       stopItem.isEnabled = true
 
+      purgeMemoryItem.isHidden = false
+      let released = stats.weightsReleased
+      purgeMemoryItem.title = released ? "Model Memory Free (Purged)" : "Free Model Memory"
+      purgeMemoryItem.isEnabled = !released && !isBusy
+
       engineStatusSeparator.isHidden = false
       engineStatusCaption.isHidden = false
       for (item, _) in statsBlock { item.isHidden = false }
@@ -284,6 +289,8 @@ final class TrayController: NSObject, NSMenuDelegate {
       stopItem.title = "Cancel Start"
       stopItem.isEnabled = true
 
+      purgeMemoryItem.isHidden = true
+
       engineStatusSeparator.isHidden = true
       engineStatusCaption.isHidden = true
       for (item, _) in statsBlock { item.isHidden = true }
@@ -298,6 +305,7 @@ final class TrayController: NSObject, NSMenuDelegate {
 
       restartItem.isHidden = true
       stopItem.isHidden = true
+      purgeMemoryItem.isHidden = true
 
       engineStatusSeparator.isHidden = true
       engineStatusCaption.isHidden = true
@@ -326,6 +334,7 @@ final class TrayController: NSObject, NSMenuDelegate {
   private var startItem: NSMenuItem!
   private var restartItem: NSMenuItem!
   private var stopItem: NSMenuItem!
+  private var purgeMemoryItem: NSMenuItem!
   private var engineStatusSeparator: NSMenuItem!
   private var engineStatusCaption: NSMenuItem!
   private var statsBlock: [(NSMenuItem, (_ placeholder: String) -> String)] = []
@@ -394,6 +403,10 @@ final class TrayController: NSObject, NSMenuDelegate {
 
     stopItem = actionItem("Stop Server", "stop.fill", #selector(stopAction))
     menu.addItem(stopItem)
+
+    purgeMemoryItem = actionItem(
+      "Free Model Memory", "arrow.down.to.line.compact", #selector(purgeMemoryAction))
+    menu.addItem(purgeMemoryItem)
 
     // 4. Live Engine Status
     engineStatusSeparator = .separator()
@@ -518,6 +531,14 @@ final class TrayController: NSObject, NSMenuDelegate {
   }
   @objc private func stopAction() {
     process.stop()
+  }
+  @objc private func purgeMemoryAction() {
+    guard !process.isBusy, !stats.weightsReleased else { return }
+    let port = config.config.port
+    let client = SplashClient()
+    Task {
+      _ = try? await client.releaseMemory(port: port)
+    }
   }
   @objc private func restartAction() {
     guard !process.isBusy else { return }

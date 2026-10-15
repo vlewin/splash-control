@@ -1,4 +1,5 @@
 import Charts
+import SplashControlKit
 import SwiftUI
 
 // MARK: - Formatting helpers
@@ -702,6 +703,8 @@ struct DashboardView: View {
   @State private var copiedWhat: String?
   @State private var confirmRestart = false
   @State private var confirmSSDCacheReset = false
+  @State private var isPurging = false
+  private let client = SplashClient()
 
   init(
     stats: StatsModel, process: SplashProcess, config: ConfigStore,
@@ -867,6 +870,17 @@ struct DashboardView: View {
       }
       .disabled(!stats.webUIAvailable)
       .help("Open the server's own web interface")
+      Divider().frame(height: 18)
+      Button {
+        purgeMemory()
+      } label: {
+        Label(
+          stats.weightsReleased ? "Purged" : (isPurging ? "Purging…" : "Free Memory"),
+          systemImage: stats.weightsReleased ? "checkmark" : "arrow.down.to.line.compact"
+        )
+      }
+      .disabled(!isRunning || stats.weightsReleased || isPurging)
+      .help("Immediately unwire model weights from RAM while preserving prefix cache")
       Spacer()
     }
     .controlSize(.small)
@@ -906,6 +920,20 @@ struct DashboardView: View {
     Task {
       try? await Task.sleep(for: .seconds(1.5))
       if copiedWhat == what { copiedWhat = nil }
+    }
+  }
+
+  private func purgeMemory() {
+    guard !isPurging, isRunning else { return }
+    isPurging = true
+    let port = config.config.port
+    Task {
+      do {
+        _ = try await client.releaseMemory(port: port)
+        await MainActor.run { isPurging = false }
+      } catch {
+        await MainActor.run { isPurging = false }
+      }
     }
   }
 
@@ -1377,18 +1405,29 @@ struct DashboardView: View {
         accent: decodeColor,
         caption: decodeCaption
       )
+      let prefillProg = stats.activePrefillProgress
       HeroPanel(
         title: "Prefill",
         value: fmt(stats.latestPrefillTps, "%.0f"),
         unit: "tok/s",
         accent: .purple,
         // The value is a windowed rate (Δ tokens ÷ Δ wall between polls),
-        // held from the last prefill that actually ran, and the caption
-        // admits its age. Both halves are needed: a held value with no age
-        // is indistinguishable from a live one, which is exactly the
-        // defect the server's lifetime average had.
-        caption: stats.latestPrefillTpsAge.map { "last prefill \(Self.ageLabel($0))" }
-          ?? "no prefill measured yet"
+        // held from the last prefill that actually ran. When an active
+        // request is prefilling, show live token progress.
+        caption: prefillProg.map {
+          "prefilling \(fmtTok($0.processed)) / \(fmtTok($0.total)) (\($0.percentText))"
+        }
+          ?? (stats.latestPrefillTpsAge.map { "last prefill \(Self.ageLabel($0))" }
+            ?? "no prefill measured yet"),
+        icon: prefillProg != nil
+          ? {
+            AnyView(
+              ProgressView(value: prefillProg!.fraction)
+                .progressViewStyle(.linear)
+                .frame(width: 44)
+                .tint(.purple)
+            )
+          } : nil
       )
       memoryHero
       let cache = stats.latest?.cache

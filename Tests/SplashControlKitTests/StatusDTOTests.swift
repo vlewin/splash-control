@@ -99,3 +99,12 @@ func completionFixtureDecodes() throws {
   #expect(reply.choices?.first?.finishReason == "stop")
   #expect(reply.error?.message == nil)
 }
+
+@Test("memory release reply decodes correctly")
+func memoryReleaseReplyDecodes() throws {
+  let json = #"{"released":true,"weights":{"idle_release_seconds":1800,"released":true,"restoring":false,"restores":1,"restore_failures":0}}"#
+  let res = try JSONDecoder().decode(SplashClient.MemoryReleaseResult.self, from: Data(json.utf8))
+  #expect(res.released == true)
+  #expect(res.weights?.released == true)
+  #expect(res.weights?.idleReleaseSeconds == 1800)
+}

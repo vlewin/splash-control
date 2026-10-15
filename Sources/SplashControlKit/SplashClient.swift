@@ -1,4 +1,5 @@
 import Foundation
+
 #if canImport(FoundationNetworking)
   import FoundationNetworking  // Linux: URLSession lives here, not in Foundation.
 #endif
@@ -50,6 +51,36 @@ public final class SplashClient {
       throw SplashError.badStatus
     }
     return try JSONDecoder().decode(StatusDTO.self, from: data)
+  }
+
+  public struct MemoryReleaseResult: Decodable, Equatable {
+    public let released: Bool?
+    public let weights: StatusDTO.Weights?
+  }
+
+  /// splash 1.3.2+: On-demand model memory purge (POST /v1/memory/release).
+  /// Unwires model weights while preserving the KV prefix cache.
+  /// Returns released status or throws SplashError.
+  public func releaseMemory(port: Int) async throws -> MemoryReleaseResult {
+    guard let url = URL(string: base(port) + "/v1/memory/release") else {
+      throw SplashError.notReachable
+    }
+    var req = URLRequest(url: url)
+    req.httpMethod = "POST"
+    req.timeoutInterval = 10
+    let (data, response) = try await session.data(for: req)
+    guard let http = response as? HTTPURLResponse else {
+      throw SplashError.badStatus
+    }
+    if http.statusCode == 200 {
+      return (try? JSONDecoder().decode(MemoryReleaseResult.self, from: data))
+        ?? MemoryReleaseResult(released: true, weights: nil)
+    } else if http.statusCode == 409 {
+      throw SplashError.engineBusy
+    } else {
+      throw SplashError.completionFailed(
+        status: http.statusCode, message: "memory release rejected")
+    }
   }
 
   public struct Completion: Decodable {
@@ -150,11 +181,13 @@ public final class SplashClient {
   public enum SplashError: LocalizedError {
     case notReachable
     case badStatus
+    case engineBusy
     case completionFailed(status: Int, message: String?)
     public var errorDescription: String? {
       switch self {
       case .notReachable: return "No reachable splash endpoint"
       case .badStatus: return "splash returned an error status"
+      case .engineBusy: return "Engine busy: cannot purge memory during generation"
       case .completionFailed(let status, let message):
         return message.map { "\(status): \($0)" } ?? "completion failed (HTTP \(status))"
       }
