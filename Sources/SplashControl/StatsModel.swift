@@ -189,7 +189,7 @@ enum AgentStatus: Equatable {
     if s.transport?.statusStale == true { return .stale }
     if s.transport?.recovering == true || s.metal?.healthy == false { return .recovering }
     if s.admission?.draining == true { return .draining }
-    if s.ready != true { return .starting }
+    if s.ready != true || s.weights?.restoring == true { return .starting }
     if (s.admission?.suspended ?? 0) > 0 { return .suspended }
     // Memory constraint outranks the phase gauges. It used to sit below them,
     // so a green "decoding" dot hid an active memory warning: the phase is a
@@ -282,7 +282,10 @@ enum AgentStatus: Equatable {
       return "\(n(s.admission?.suspended)) suspended"
     case .draining:
       return "\(n(s.admission?.waiting)) still waiting"
-    case .starting, .stopped, .idle, .error:
+    case .starting:
+      if s.weights?.restoring == true { return "restoring weights" }
+      return nil
+    case .stopped, .idle, .error:
       return nil
     }
   }

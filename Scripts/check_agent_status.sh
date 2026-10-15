@@ -103,6 +103,8 @@ check("constrained detail still names the decode", "warning · host 11.2 GiB hea
 check("constrained detail names both phases when both run", "engine 0.3 GiB headroom · 132 denied · prefill 1 · decode 1", detail(#"{"ready":true,"memory_governor":{"growth_allowed":false,"headroom_bytes":322122547,"denied_reservations":132},"scheduler":{"prefilling":1,"decoding":1}}"#, .budgetCapped) ?? "nil")
 check("constrained detail adds nothing when idle", "warning · host 11.2 GiB headroom", detail(#"{"ready":true,"memory_pressure":"warning","memory_governor":{"host_headroom_bytes":12025908428}}"#, .memoryPressure) ?? "nil")
 check("starting", "starting", status(#"{"ready":false}"#)?.label)
+check("restoring weights is starting", "starting", status(#"{"ready":true,"weights":{"restoring":true}}"#)?.label)
+check("restoring weights detail", "restoring weights", detail(#"{"ready":true,"weights":{"restoring":true}}"#, .starting) ?? "nil")
 // Precedence: a stale snapshot must not read as decoding, and ready:false wins
 // over in-flight work (the snapshot predates the work).
 check("stale beats decoding", "stale", status(#"{"ready":true,"transport":{"status_stale":true},"scheduler":{"decoding":1}}"#)?.label)

@@ -1,6 +1,6 @@
 import Foundation
 
-/// Codable mirror of `GET /status` as served by splash 1.2.0–1.3.1 (`schema_version 6`).
+/// Codable mirror of `GET /status` as served by splash 1.2.0–1.3.2 (`schema_version 6`).
 /// Optional everywhere the server may omit a key; consumers must tolerate nils.
 /// Keys this DTO does not model yet (`latency`, `frontend`, `response_store`,
 /// `image_cache`, `grammar_cache`, `model_timing`, `draft_context`, `warmup`,
@@ -45,6 +45,8 @@ public struct StatusDTO: Codable, Equatable {
   /// while it serves, `off` when startup left the GPU alone, `stopped` once the
   /// breaker stopped it (until engine restart).
   public var aneFfn: AneFfn?
+  /// splash 1.3.2+: live in-flight request snapshots.
+  public var activeRequests: [ActiveRequest]?
 
   public enum CodingKeys: String, CodingKey {
     case ready
@@ -58,6 +60,28 @@ public struct StatusDTO: Codable, Equatable {
     case memoryGovernor = "memory_governor"
     case kv, state, cache, identity, disk, weights
     case aneFfn = "ane_ffn"
+    case activeRequests = "active_requests"
+  }
+
+  /// splash 1.3.2+: Live request snapshot from `/status.active_requests`.
+  public struct ActiveRequest: Codable, Equatable {
+    public var id: UInt64?
+    public var phase: String?
+    public var priority: String?
+    public var promptTokens: UInt64?
+    public var promptProcessed: UInt64?
+    public var generatedTokens: UInt64?
+    public var maxNewTokens: UInt64?
+    public var ageMs: Double?
+
+    public enum CodingKeys: String, CodingKey {
+      case id, phase, priority
+      case promptTokens = "prompt_tokens"
+      case promptProcessed = "prompt_processed"
+      case generatedTokens = "generated_tokens"
+      case maxNewTokens = "max_new_tokens"
+      case ageMs = "age_ms"
+    }
   }
 
   /// splash 1.2.1+. The engine
@@ -74,9 +98,11 @@ public struct StatusDTO: Codable, Equatable {
     public var restores: UInt64?
     /// splash 1.3.1+: How many times weight restores failed or timed out.
     public var restoreFailures: UInt64?
+    /// splash 1.3.2+: Whether model weights are actively being restored into memory.
+    public var restoring: Bool?
     public enum CodingKeys: String, CodingKey {
       case idleReleaseSeconds = "idle_release_seconds"
-      case released, restores
+      case released, restores, restoring
       case restoreFailures = "restore_failures"
     }
   }
@@ -141,6 +167,8 @@ public struct StatusDTO: Codable, Equatable {
     public struct Model: Codable, Equatable {
       public var modelName: String?
       public var maximumContextTokens: Int?
+      /// splash 1.3.2+: recurrent state storage format ("fp32" | "bf16").
+      public var stateFormat: String?
       /// The model's fixed weight cost, in three pieces. Constant for a
       /// given model — a floor, not a time series, so it belongs on a chart
       /// as a reference line rather than a plotted series.
@@ -148,6 +176,7 @@ public struct StatusDTO: Codable, Equatable {
       enum CodingKeys: String, CodingKey {
         case modelName = "model_name"
         case maximumContextTokens = "maximum_context_tokens"
+        case stateFormat = "state_format"
         case memory
       }
     }
@@ -365,6 +394,9 @@ public struct StatusDTO: Codable, Equatable {
     public var deniedReservations: UInt64?
     public var growthAllowed: Bool?
     public var systemPressure: String?
+    /// splash 1.3.2+: spare bytes on host and spare reserve bytes
+    public var hostSpareBytes: UInt64?
+    public var hostSpareReserveBytes: UInt64?
     /// schema 6 `charged_bytes`
     public var chargedBytes: UInt64?
     /// schema 5 `observed_resident_bytes`; removed in schema 6
@@ -374,6 +406,8 @@ public struct StatusDTO: Codable, Equatable {
       case headroomBytes = "headroom_bytes"
       case hostAvailableBytes = "host_available_bytes"
       case hostHeadroomBytes = "host_headroom_bytes"
+      case hostSpareBytes = "host_spare_bytes"
+      case hostSpareReserveBytes = "host_spare_reserve_bytes"
       case hostMeasurementValid = "host_measurement_valid"
       case deniedReservations = "denied_reservations"
       case growthAllowed = "growth_allowed"
@@ -477,6 +511,11 @@ public struct StatusDTO: Codable, Equatable {
     public var kvDemotions: Int?
     public var kvDemotionsRefused: Int?
     public var kvRestoreFailures: Int?
+    /// splash 1.3.2+: dynamic disk limit and volume availability
+    public var limitBytes: UInt64?
+    public var volumeAvailableBytes: UInt64?
+    public var writesGated: String?
+    public var writeBudgetBytes: UInt64?
     public enum CodingKeys: String, CodingKey {
       case capacityBytes = "capacity_bytes"
       case usedBytes = "used_bytes"
@@ -486,6 +525,10 @@ public struct StatusDTO: Codable, Equatable {
       case kvDemotions = "kv_demotions"
       case kvDemotionsRefused = "kv_demotions_refused"
       case kvRestoreFailures = "kv_restore_failures"
+      case limitBytes = "limit_bytes"
+      case volumeAvailableBytes = "volume_available_bytes"
+      case writesGated = "writes_gated"
+      case writeBudgetBytes = "write_budget_bytes"
     }
 
     /// Fraction of the quota in use. `used_bytes` is the tier's **whole**
@@ -511,10 +554,13 @@ public struct StatusDTO: Codable, Equatable {
     public var hits: Int?
     public var hitRate: Double?
     public var reusedTokens: UInt64?
+    /// splash 1.3.2+: deduplicated KV tokens across sequences
+    public var deduplicatedKvTokens: UInt64?
     public enum CodingKeys: String, CodingKey {
       case hits
       case hitRate = "hit_rate"
       case reusedTokens = "reused_tokens"
+      case deduplicatedKvTokens = "deduplicated_kv_tokens"
     }
   }
 }
