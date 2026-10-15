@@ -114,6 +114,16 @@ private struct SeriesChart: View {
   var desiredTicks: Int = 5
   /// Rolling window for the x-axis (the buffer may retain more).
   var window: TimeInterval = 60 * 60
+  /// Optional horizontal threshold rules (e.g. context ceiling)
+  var thresholdLines: [ThresholdLine] = []
+  struct ThresholdLine: Equatable {
+    let value: Double
+    let label: String
+    let color: Color
+    var position: AnnotationPosition = .bottom
+    var alignment: Alignment = .leading
+    var pinsMax: Bool = true
+  }
   /// Primary-series render mode: plain line or prominent bars.
   var mode: Mode = .line
 
@@ -275,9 +285,10 @@ private struct SeriesChart: View {
   private var yUpper: Double {
     if let yMax { return yMax }
     let top = visiblePoints.compactMap(\.value).max() ?? 0
-    if let yMinFloor { return max(top, yMinFloor) }
-    if mode != .bars { return max(top, 1.0) }
-    return StatsModel.autoScaleCeiling(observed: top)
+    let bound = max(top, thresholdLines.filter(\.pinsMax).map(\.value).max() ?? 0)
+    if let yMinFloor { return max(bound, yMinFloor) }
+    if mode != .bars { return max(bound, 1.0) }
+    return StatsModel.autoScaleCeiling(observed: bound)
   }
 
   private func statLabel(_ name: String, _ v: Double?) -> some View {
@@ -404,8 +415,29 @@ private struct SeriesChart: View {
   private var styledChart: some View {
     let currentPoints = visiblePoints
     let currentBarWidth = barWidth
+    let currentThresholds = thresholdLines
     let domain = plotDomain ?? .distantPast ... .distantFuture
     let chart = Chart {
+      ForEach(currentThresholds, id: \.label) { threshold in
+        RuleMark(y: .value("Threshold", threshold.value))
+          .foregroundStyle(threshold.color.opacity(0.85))
+          .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 3]))
+          .annotation(position: threshold.position, alignment: threshold.alignment, spacing: 2) {
+            Text(threshold.label)
+              .font(.system(size: 8, weight: .semibold, design: .monospaced))
+              .foregroundStyle(threshold.color)
+              .padding(.horizontal, 4)
+              .padding(.vertical, 1.5)
+              .background(
+                RoundedRectangle(cornerRadius: 3)
+                  .fill(Color(nsColor: .controlBackgroundColor).opacity(0.85))
+              )
+              .overlay(
+                RoundedRectangle(cornerRadius: 3)
+                  .strokeBorder(threshold.color.opacity(0.5), lineWidth: 0.5)
+              )
+          }
+      }
       if mode == .bars {
         ForEach(currentPoints) { point in
           if let pv = point.value {
@@ -448,7 +480,9 @@ private struct SeriesChart: View {
           case .critical: return .red
           case .warn: return .orange
           default:
-            return marker.label.starts(with: "Thermal") ? .orange : .blue
+            if marker.label.starts(with: "Thermal") { return .orange }
+            if marker.label.starts(with: "Compact") { return .orange }
+            return .blue
           }
         }()
 
@@ -464,52 +498,31 @@ private struct SeriesChart: View {
             position: .bottom, alignment: .center, spacing: 23,
             overflowResolution: .init(x: .fit(to: .chart), y: .disabled)
           ) {
-            let (icon, text): (String, String) = {
+            let icon: String = {
               if marker.label.starts(with: "Thermal") {
-                let state: String
-                if let arrow = marker.label.range(of: "→ ") {
-                  state = String(marker.label[arrow.upperBound...]).trimmingCharacters(
-                    in: .whitespaces)
-                } else if let colon = marker.label.firstIndex(of: ":") {
-                  let after = marker.label.index(after: colon)
-                  state = String(marker.label[after...]).trimmingCharacters(in: .whitespaces)
-                } else {
-                  state = marker.label
-                }
-                return ("flame.fill", state)
+                return "flame.fill"
               } else if marker.label.starts(with: "Power") {
-                let mode: String
-                if let colon = marker.label.firstIndex(of: ":") {
-                  let after = marker.label.index(after: colon)
-                  mode = String(marker.label[after...]).trimmingCharacters(in: .whitespaces)
-                } else {
-                  mode = marker.label
-                }
-                return ("bolt.fill", mode)
+                return "bolt.fill"
+              } else if marker.label.starts(with: "Compact") {
+                return "scissors"
               }
-              return ("", marker.label)
+              return "circle.fill"
             }()
-            HStack(spacing: 3) {
-              if !icon.isEmpty {
-                Image(systemName: icon)
-                  .font(.system(size: 7))
-                  .foregroundStyle(markerColor)
-              }
-              Text(text)
-                .font(.system(size: 8, weight: .semibold, design: .monospaced))
-                .foregroundStyle(.primary)
-            }
-            .padding(.horizontal, 5)
-            .padding(.vertical, 2)
-            .background(
-              RoundedRectangle(cornerRadius: 3)
-                .fill(Color(nsColor: .controlBackgroundColor))
-            )
-            .overlay(
-              RoundedRectangle(cornerRadius: 3)
-                .strokeBorder(markerColor.opacity(0.6), lineWidth: 1)
-            )
-            .shadow(color: Color.black.opacity(0.12), radius: 1, x: 0, y: 1)
+            Image(systemName: icon)
+              .font(.system(size: 7, weight: .semibold))
+              .foregroundStyle(markerColor)
+              .padding(.horizontal, 4)
+              .padding(.vertical, 2)
+              .background(
+                RoundedRectangle(cornerRadius: 3)
+                  .fill(Color(nsColor: .controlBackgroundColor))
+              )
+              .overlay(
+                RoundedRectangle(cornerRadius: 3)
+                  .strokeBorder(markerColor.opacity(0.6), lineWidth: 1)
+              )
+              .shadow(color: Color.black.opacity(0.12), radius: 1, x: 0, y: 1)
+              .help(marker.label)
           }
       }
       // The scrub rule, drawn last so it sits above the data.
@@ -1062,10 +1075,27 @@ struct DashboardView: View {
           ],
           yMinFloor: 32.0,
           desiredTicks: 3,
-          window: window
+          window: window,
+          thresholdLines: contextCeilingLines
         )
       }
     }
+  }
+
+  private var contextCeilingLines: [SeriesChart.ThresholdLine] {
+    guard let maxTok = stats.contextCap, maxTok > 0 else { return [] }
+    let capK = Double(maxTok) / 1000.0
+    let label = String(format: "cap %.0fK", Double(maxTok) / 1024.0)
+    return [
+      SeriesChart.ThresholdLine(
+        value: capK,
+        label: label,
+        color: Color.secondary.opacity(0.75),
+        position: .bottom,
+        alignment: .leading,
+        pinsMax: capK <= 140.0
+      )
+    ]
   }
 
   /// Compact age for a held reading: seconds while that is meaningful, then
