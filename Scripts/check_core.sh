@@ -200,7 +200,8 @@ let full = dto("""
   "identity":{"cache":{"build_id":"bid","dtype":"q8s8"}},
  "weights":{"idle_release_seconds":600,"released":false,"restores":2},
  "ane_ffn":{"state":"split","share":0.41,"minimum_rows":640,"reason":"r","split_commands":3,
-  "reruns":1,"ane_ms":1234.5,"evaluations":192}}
+  "reruns":1,"ane_ms":1234.5,"evaluations":192},
+ "active_requests":[{"id":101,"phase":"prefill","prompt_tokens":100}]}
 """)
 
 // BUG-9 guard, generalised. This has now bitten three times in one session: a

@@ -60,6 +60,29 @@ func status131FixtureDecodes() throws {
   #expect(s.state?.idleContextWindows == 3)
 }
 
+@Test("1.3.2 fixture decodes active_requests, weights.restoring, state_format, and disk/cache additions")
+func status132FixtureDecodes() throws {
+  let s = try JSONDecoder().decode(StatusDTO.self, from: try fixture("status_schema6_1_3_2.json"))
+  #expect(s.ready == true)
+  #expect(s.weights?.restoring == true)
+  #expect(s.memoryPlan?.model?.stateFormat == "bf16")
+  #expect(s.memoryGovernor?.hostSpareBytes == 1073741824)
+  #expect(s.memoryGovernor?.hostSpareReserveBytes == 536870912)
+  #expect(s.disk?.limitBytes == 34359738368)
+  #expect(s.disk?.volumeAvailableBytes == 197568491520)
+  #expect(s.disk?.writesGated == "no")
+  #expect(s.cache?.deduplicatedKvTokens == 1024)
+  #expect(s.activeRequests?.count == 1)
+  let req = try #require(s.activeRequests?.first)
+  #expect(req.id == 101)
+  #expect(req.phase == "prefill")
+  #expect(req.promptTokens == 16384)
+  #expect(req.promptProcessed == 4096)
+  #expect(req.generatedTokens == 0)
+  #expect(req.maxNewTokens == 1024)
+  #expect(req.ageMs == 1250.0)
+}
+
 @Test("renamed key decodes to nil, not garbage")
 func renamedKeyDecodesToNil() throws {
   let json = #"{"ready":true,"max_context_tokens":99999}"#
