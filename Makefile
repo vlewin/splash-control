@@ -19,7 +19,7 @@ test: ## swift-testing suite (needs the Testing module, e.g. `brew install swift
 	PATH=$(SWIFT_TOOLCHAIN)/bin:$(PATH) swift test
 
 lint: ## formatter gate, zero warnings (strict)
-	/usr/bin/swift format lint --strict --recursive Sources
+	xcrun swift-format lint --strict --recursive Sources
 
 verify: ## all hard gates: check + test + lint, every one green
 	make check && make test && make lint
