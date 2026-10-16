@@ -21,6 +21,7 @@ struct InfoView: View {
   @ObservedObject var config: ConfigStore
   @ObservedObject var process: SplashProcess
   @ObservedObject var stats: StatsModel
+  @ObservedObject var updates = UpdateManager.shared
 
   /// Tested-against splash range ("supported" = releases this app renders
   /// fully). Floor 1.2.0 = status schema 6, the DTO's model; max 1.3.2 = the
@@ -34,6 +35,7 @@ struct InfoView: View {
     ScrollView {
       VStack(spacing: 12) {
         hero
+        updateCard
         runtimeCard
         creditsCard
       }
@@ -72,6 +74,155 @@ struct InfoView: View {
         .fixedSize()
       }
       .frame(maxWidth: .infinity)
+    }
+  }
+
+  private var updateCard: some View {
+    card("Updates") {
+      VStack(alignment: .leading, spacing: 10) {
+        HStack(spacing: 8) {
+          VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 6) {
+              Text("Splash Control")
+                .font(.subheadline.weight(.medium))
+                .lineLimit(1)
+              statusBadge
+            }
+            Text(statusDetail)
+              .font(.caption)
+              .foregroundStyle(.secondary)
+              .lineLimit(1)
+          }
+          Spacer()
+          actionControls
+        }
+
+        if updates.isInstalledViaCask {
+          Divider().opacity(0.4)
+          HStack(spacing: 6) {
+            Image(systemName: "terminal")
+              .font(.caption2)
+              .foregroundStyle(.tertiary)
+            Text("Installed via Homebrew Cask. You can update here or run ")
+              .font(.caption2)
+              .foregroundStyle(.tertiary)
+              .lineLimit(1)
+            Text("brew upgrade --cask splash-control")
+              .font(.system(.caption2, design: .monospaced))
+              .foregroundStyle(.secondary)
+              .lineLimit(1)
+          }
+        }
+      }
+    }
+  }
+
+  @ViewBuilder
+  private var statusBadge: some View {
+    switch updates.state {
+    case .idle:
+      EmptyView()
+    case .checking:
+      ProgressView()
+        .controlSize(.mini)
+    case .upToDate:
+      Text("Latest")
+        .font(.caption2.weight(.medium))
+        .padding(.horizontal, 6)
+        .padding(.vertical, 2)
+        .background(Color.green.opacity(0.15), in: Capsule())
+        .foregroundStyle(.green)
+    case .updateAvailable(let release):
+      Text("v\(release.version) Available")
+        .font(.caption2.weight(.medium))
+        .padding(.horizontal, 6)
+        .padding(.vertical, 2)
+        .background(Color.accentColor.opacity(0.15), in: Capsule())
+        .foregroundStyle(Color.accentColor)
+    case .downloading:
+      Text("Downloading")
+        .font(.caption2.weight(.medium))
+        .padding(.horizontal, 6)
+        .padding(.vertical, 2)
+        .background(Color.accentColor.opacity(0.15), in: Capsule())
+        .foregroundStyle(Color.accentColor)
+    case .readyToRestart:
+      Text("Ready to Relaunch")
+        .font(.caption2.weight(.medium))
+        .padding(.horizontal, 6)
+        .padding(.vertical, 2)
+        .background(Color.green.opacity(0.15), in: Capsule())
+        .foregroundStyle(.green)
+    case .failed:
+      Text("Check Failed")
+        .font(.caption2.weight(.medium))
+        .padding(.horizontal, 6)
+        .padding(.vertical, 2)
+        .background(Color.red.opacity(0.15), in: Capsule())
+        .foregroundStyle(.red)
+    }
+  }
+
+  private var statusDetail: String {
+    switch updates.state {
+    case .idle:
+      return "Current version is v\(SplashLog.version)"
+    case .checking:
+      return "Checking GitHub Releases..."
+    case .upToDate(let version):
+      return "v\(version) is the latest release"
+    case .updateAvailable:
+      return "Current version is v\(SplashLog.version) · Click Update Now to install and restart"
+    case .downloading(let progress):
+      return "Downloading update archive... \(Int(progress * 100))%"
+    case .readyToRestart(let release):
+      return "Downloaded v\(release.version) · Relaunching..."
+    case .failed(let message):
+      return message
+    }
+  }
+
+  @ViewBuilder
+  private var actionControls: some View {
+    switch updates.state {
+    case .idle, .upToDate, .failed:
+      Button {
+        Task { await updates.checkForUpdates(silent: false) }
+      } label: {
+        Label("Check for Updates", systemImage: "arrow.clockwise")
+      }
+      .controlSize(.small)
+    case .checking:
+      Button {
+      } label: {
+        Label("Checking...", systemImage: "arrow.clockwise")
+      }
+      .controlSize(.small)
+      .disabled(true)
+    case .updateAvailable(let release):
+      HStack(spacing: 8) {
+        Button {
+          NSWorkspace.shared.open(release.htmlURL)
+        } label: {
+          Text("Release Notes")
+        }
+        .controlSize(.small)
+
+        Button {
+          updates.downloadAndInstall(release: release)
+        } label: {
+          Label("Update Now", systemImage: "arrow.down.circle.fill")
+        }
+        .buttonStyle(.borderedProminent)
+        .controlSize(.small)
+      }
+    case .downloading(let progress):
+      ProgressView(value: progress)
+        .progressViewStyle(.linear)
+        .frame(width: 100)
+    case .readyToRestart:
+      ProgressView()
+        .controlSize(.small)
     }
   }
 

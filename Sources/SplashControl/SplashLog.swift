@@ -34,9 +34,19 @@ final class SplashLog {
 
   static let shared = SplashLog()
 
-  /// App version: CFBundleShortVersionString from Info.plist ("dev" under `swift run`).
+  /// App version: CFBundleShortVersionString from Info.plist, falling back to LastInstalledReleaseTag.
   static var version: String {
-    (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? "dev"
+    if let plistVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String,
+      plistVersion != "1.0.0" && plistVersion != "dev"
+    {
+      return plistVersion
+    }
+    if let installedTag = UserDefaults.standard.string(forKey: "LastInstalledReleaseTag"),
+      !installedTag.isEmpty
+    {
+      return installedTag.hasPrefix("v") ? String(installedTag.dropFirst()) : installedTag
+    }
+    return (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? "dev"
   }
 
   static var logDirectory: URL {

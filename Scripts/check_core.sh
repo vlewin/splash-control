@@ -2196,6 +2196,7 @@ swiftc -O -o "$work/check" \
   Sources/SplashControl/ModelBenchmark.swift \
   Sources/SplashControl/SplashLog.swift \
   Sources/SplashControl/SplashProcess.swift \
+  Sources/SplashControl/UpdateManager.swift \
   "$work/main.swift"
 
 "$work/check" "$@"

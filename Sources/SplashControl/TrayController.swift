@@ -14,6 +14,7 @@ final class TrayController: NSObject, NSMenuDelegate {
   private let config: ConfigStore
   private let openDashboard: () -> Void
   private let openSettings: () -> Void
+  private let openInfo: () -> Void
   private let requestQuit: () -> Void
 
   private var cancellables = Set<AnyCancellable>()
@@ -22,13 +23,14 @@ final class TrayController: NSObject, NSMenuDelegate {
   init(
     process: SplashProcess, stats: StatsModel, config: ConfigStore,
     openDashboard: @escaping () -> Void, openSettings: @escaping () -> Void,
-    requestQuit: @escaping () -> Void
+    openInfo: @escaping () -> Void, requestQuit: @escaping () -> Void
   ) {
     self.process = process
     self.stats = stats
     self.config = config
     self.openDashboard = openDashboard
     self.openSettings = openSettings
+    self.openInfo = openInfo
     self.requestQuit = requestQuit
     self.statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     super.init()
@@ -69,6 +71,13 @@ final class TrayController: NSObject, NSMenuDelegate {
       .sink { [weak self] _ in
         self?.updateIcon()
         self?.updateTitle()
+        self?.updateActions()
+      }
+      .store(in: &cancellables)
+
+    UpdateManager.shared.$state
+      .receive(on: RunLoop.main)
+      .sink { [weak self] _ in
         self?.updateActions()
       }
       .store(in: &cancellables)
@@ -251,6 +260,13 @@ final class TrayController: NSObject, NSMenuDelegate {
   }
 
   private func updateActions() {
+    if case .updateAvailable(let release) = UpdateManager.shared.state {
+      updateAvailableItem.isHidden = false
+      updateAvailableItem.title = "Update Available (v\(release.version))…"
+    } else {
+      updateAvailableItem.isHidden = true
+    }
+
     let isRunning: Bool
     if case .running = process.state { isRunning = true } else { isRunning = false }
     let isStarting = process.state == .starting
@@ -315,6 +331,7 @@ final class TrayController: NSObject, NSMenuDelegate {
 
   // MARK: - Menu
 
+  private var updateAvailableItem: NSMenuItem!
   private var headerItem: NSMenuItem!
   private var headerView: MenuFillingHostingView<TrayHeaderView>!
   private var dashboardItem: NSMenuItem!
@@ -441,6 +458,11 @@ final class TrayController: NSObject, NSMenuDelegate {
 
     // 6. Preferences & App Lifecycle
     menu.addItem(.separator())
+    updateAvailableItem = actionItem(
+      "Update Available…", "sparkles", #selector(openUpdateAction))
+    updateAvailableItem.isHidden = true
+    menu.addItem(updateAvailableItem)
+
     let settings = actionItem("Settings…", "gearshape", #selector(settingsAction))
     settings.keyEquivalent = "s"
     settings.keyEquivalentModifierMask = .command
@@ -574,6 +596,7 @@ final class TrayController: NSObject, NSMenuDelegate {
       await self?.process.hardRestart(serving: serving, force: true)
     }
   }
+  @objc private func openUpdateAction() { openInfo() }
   @objc private func dashboardAction() { openDashboard() }
   @objc private func webuiAction() {
     guard let url = URL(string: "http://127.0.0.1:\(config.config.port)/") else { return }

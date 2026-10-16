@@ -66,6 +66,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
       config: config,
       openDashboard: { [weak self] in self?.showDashboard() },
       openSettings: { [weak self] in self?.showSettings() },
+      openInfo: { [weak self] in self?.showInfo() },
       requestQuit: { [weak self] in self?.quit() }
     )
 
@@ -132,6 +133,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         try? await Task.sleep(for: .seconds(interval))
       }
+    }
+
+    // Unobtrusive update check 3 seconds after launch so startup remains instant
+    Task {
+      try? await Task.sleep(for: .seconds(3))
+      await UpdateManager.shared.checkForUpdates(silent: true)
     }
   }
 
@@ -420,5 +427,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
   private func showSettings() {
     showDashboard(tab: 4)
+  }
+
+  private func showInfo() {
+    showDashboard(tab: 5)
   }
 }
