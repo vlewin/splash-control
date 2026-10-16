@@ -37,6 +37,8 @@ cask "splash-control" do
 
   url "https://github.com/${REPO}/releases/download/v#{version}/SplashControl-v#{version}.zip"
 
+  auto_updates true
+
   depends_on arch: :arm64
   # 26.4 floor per Resources/Info.plist; brew symbols are major-series only.
   depends_on macos: :tahoe
