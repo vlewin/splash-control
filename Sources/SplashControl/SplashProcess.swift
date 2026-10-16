@@ -181,7 +181,7 @@ final class SplashProcess: ObservableObject {
   /// never passed, whatever the config says.
   nonisolated static let gatedFlags = [
     "--persistent-cache", "--idle-release", "--served-model-name", "--announce-served-name",
-    "--default-reasoning-effort", "--disable-ane",
+    "--default-reasoning-effort", "--disable-ane", "--state-format",
   ]
 
   /// Fills `serveFlags` from the binary about to be exec'd. Runs once per spawn
@@ -206,6 +206,7 @@ final class SplashProcess: ObservableObject {
     if config.announceServedName { want.append("--announce-served-name") }
     if let e = config.reasoningEffort, !e.isEmpty { want.append("--default-reasoning-effort") }
     if config.disableAne { want.append("--disable-ane") }
+    if let sf = config.stateFormat, !sf.isEmpty { want.append("--state-format") }
     return want.filter { serveFlags.contains($0) }
   }
 
@@ -279,12 +280,19 @@ final class SplashProcess: ObservableObject {
   /// The exact `splash serve` command line for a config. Pure in `cfg`, so it
   /// is `static` and internal: Scripts/check_core.sh asserts it, because a
   /// wrong flag here is invisible until the server refuses to start.
-  static func buildLaunchArgs(_ cfg: SplashConfig, supports: Set<String> = []) -> [String] {
+  nonisolated static func buildLaunchArgs(
+    _ cfg: SplashConfig, supports: Set<String> = []
+  ) -> [String] {
     var args = ["serve", "--model", cfg.model, "--port", String(cfg.port)]
     if let m = cfg.maxMemory, !m.isEmpty { args += ["--max-memory", m] }
     if let c = cfg.maxContext, !c.isEmpty { args += ["--max-context", c] }
     if let f = cfg.kvFormat, !f.isEmpty { args += ["--kv-format", f] }
-    if let d = cfg.maxCacheDisk, !d.isEmpty, d != "0" { args += ["--max-cache-disk", d] }
+    if let sf = cfg.stateFormat, !sf.isEmpty, supports.contains("--state-format") {
+      args += ["--state-format", sf]
+    }
+    if let d = cfg.maxCacheDisk, !d.isEmpty {
+      args += ["--max-cache-disk", d]
+    }
     if let h = cfg.allowedHost, !h.isEmpty {
       for host in h.split(whereSeparator: { $0 == " " || $0 == "\t" }) {
         args += ["--allowed-host", String(host)]

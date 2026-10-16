@@ -13,7 +13,9 @@ struct SplashConfig: Codable, Equatable {
   var maxContext: String? = SplashConfig.defaultMaxContext(physicalGiB: HostMemory.physicalGiB)
   /// "int8" or "bf16" — `splash serve --kv-format`; nil = int8 (server default)
   var kvFormat: String? = nil
-  /// e.g. "5G" — `splash serve --max-cache-disk` SSD tier; nil/0 = disabled
+  /// "fp32" or "bf16" — `splash serve --state-format`; nil = fp32 (server default)
+  var stateFormat: String? = nil
+  /// e.g. "5G", "auto", or "0" — `splash serve --max-cache-disk` SSD tier; nil/auto = auto (default)
   var maxCacheDisk: String? = nil
   /// Keep the SSD tier's conversation prefixes across restarts
   /// (`splash serve --persistent-cache`). Needs a non-zero `maxCacheDisk`.
@@ -128,7 +130,8 @@ struct SplashConfig: Codable, Equatable {
   }
 
   private enum CodingKeys: String, CodingKey {
-    case model, port, maxMemory, maxContext, kvFormat, maxCacheDisk, noWebUI, languageOnly,
+    case model, port, maxMemory, maxContext, kvFormat, stateFormat, maxCacheDisk, noWebUI,
+      languageOnly,
       disableAne,
       allowedHost,
       maxRequestSize, maxImagePixels, apiKey, extraArgs, splashPath,
@@ -147,6 +150,7 @@ struct SplashConfig: Codable, Equatable {
     maxMemory = try c.decodeIfPresent(String.self, forKey: .maxMemory) ?? d.maxMemory
     maxContext = try c.decodeIfPresent(String.self, forKey: .maxContext) ?? d.maxContext
     kvFormat = try c.decodeIfPresent(String.self, forKey: .kvFormat) ?? d.kvFormat
+    stateFormat = try c.decodeIfPresent(String.self, forKey: .stateFormat) ?? d.stateFormat
     maxCacheDisk = try c.decodeIfPresent(String.self, forKey: .maxCacheDisk) ?? d.maxCacheDisk
     persistentCache =
       try c.decodeIfPresent(Bool.self, forKey: .persistentCache) ?? d.persistentCache

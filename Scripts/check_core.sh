@@ -884,7 +884,8 @@ check("languageOnly survives a save/load round-trip",
     let b = SplashProcess.buildLaunchArgs(blank)
     check("blank values are dropped", b.contains("--max-memory"), false)
     check("blank kvFormat is dropped", b.contains("--kv-format"), false)
-    check("\"0\" cache disk is treated as disabled", SplashProcess.buildLaunchArgs({ var z = SplashConfig(); z.maxCacheDisk = "0"; return z }()).contains("--max-cache-disk"), false)
+    check("blank maxCacheDisk is dropped", b.contains("--max-cache-disk"), false)
+    check("\"0\" cache disk passes --max-cache-disk 0", SplashProcess.buildLaunchArgs({ var z = SplashConfig(); z.maxCacheDisk = "0"; return z }()).contains("0"), true)
 
     // MARK: Gated flags — the crash-loop guard
     //
@@ -2005,6 +2006,10 @@ do {
           SettingsValidator.diskTier("")?.ok, true)
     check("disk tier: '0' is disabled",
           SettingsValidator.diskTier("0")?.text.contains("Disabled"), true)
+    check("disk tier: 'auto' is accepted",
+          SettingsValidator.diskTier("auto")?.ok, true)
+    check("disk tier: 'auto' describes quota",
+          SettingsValidator.diskTier("auto")?.text.contains("32 GiB"), true)
     check("disk tier: 5G is accepted", SettingsValidator.diskTier("5G")?.ok, true)
     check("disk tier: a bare number is rejected", SettingsValidator.diskTier("5")?.ok, false)
 

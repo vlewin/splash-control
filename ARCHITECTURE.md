@@ -98,10 +98,12 @@ A status query that times out under heavy GPU work returns the last snapshot wit
 
 ### 4.6 `splash serve` CLI surface
 The argument parser is strict (`parse_args`); an unknown flag causes an immediate crash-loop (exit 2).
-`SplashProcess.buildLaunchArgs` passes 17 supported flags (`--model`, `--port`, `--max-memory`, `--max-context`, `--kv-format`, `--max-cache-disk`, `--allowed-host`, `--max-request-size`, `--max-image-pixels`, `--api-key`, `--no-webui`, `--language-only`, `--persistent-cache`, `--idle-release`, `--served-model-name`, `--announce-served-name`, `--default-reasoning-effort`).
+`SplashProcess.buildLaunchArgs` passes 18 supported flags (`--model`, `--port`, `--max-memory`, `--max-context`, `--kv-format`, `--state-format`, `--max-cache-disk`, `--allowed-host`, `--max-request-size`, `--max-image-pixels`, `--api-key`, `--no-webui`, `--language-only`, `--persistent-cache`, `--idle-release`, `--served-model-name`, `--announce-served-name`, `--default-reasoning-effort`).
 
 Flag rules:
-- `--persistent-cache` (1.2.0+) strictly requires `--max-cache-disk`.
+- `--state-format` (1.3.2+) accepts `fp32` (default) or `bf16` (halves recurrent-state storage).
+- `--max-cache-disk` (1.3.2+) defaults to `auto` (up to 32G), `0` explicitly disables.
+- `--persistent-cache` (1.2.0+) strictly requires SSD cache not turned off with `--max-cache-disk 0`.
 - `--idle-release` accepts only `off` or numbers with single `s`/`m`/`h` suffix (`15` = 15 seconds).
 - `extraArgs` cannot pass request parameters (e.g. `--temperature` will crash-loop).
 - Reasoning effort is a prompt template variable, not an engine flag.

@@ -390,6 +390,28 @@ struct SettingsView: View {
           .frame(width: 190, alignment: .trailing)
         }
 
+        // Recurrent State Format (splash 1.3.2+)
+        formRow(
+          "Recurrent State Format",
+          "FP32 default · BF16 halves GDN state RAM and SSD cache footprint",
+          help:
+            "Format for recurrent state storage (--state-format). bf16 halves each state's size, doubling state capacity in RAM and the SSD cache."
+        ) {
+          Picker(
+            "",
+            selection: Binding(
+              get: { config.config.stateFormat ?? "fp32" },
+              set: { config.config.stateFormat = $0 == "fp32" ? nil : $0 }
+            )
+          ) {
+            Text("FP32 (Default)").tag("fp32")
+            Text("BF16 (Half Size)").tag("bf16")
+          }
+          .pickerStyle(.menu)
+          .labelsHidden()
+          .frame(width: 190, alignment: .trailing)
+        }
+
         // Idle Release
         let (idleSub, idleWarn) = idleReleaseSubtitle()
         formRow(
@@ -447,24 +469,66 @@ struct SettingsView: View {
         let diskWarning = diskVerdict?.ok == false ? diskVerdict?.text : nil
         let diskSubtitle =
           diskWarning == nil
-          ? (diskVerdict?.text ?? "SSD quota for offloading KV cache · blank or 0 = off") : ""
+          ? (diskVerdict?.text ?? "SSD quota for cached KV pages and states · Auto = up to 32 GiB")
+          : ""
+        let currentDiskVal = config.config.maxCacheDisk ?? "auto"
+        let standardTiers = ["auto", "0", "5G", "10G", "16G", "32G"]
+        let isCustomTier = !standardTiers.contains(currentDiskVal)
         formRow(
           "Disk Cache Tier", diskSubtitle, warning: diskWarning,
           help:
-            "SSD quota for cached KV pages and states. Temporary unless Persistent disk cache is on: the tier is discarded on restart."
+            "SSD quota for cached KV pages and states (--max-cache-disk). Auto follows volume free space up to 32G, 0 disables. Temporary unless Persist Cache is on."
         ) {
-          TextField(
-            "0 (Off)",
-            text: Binding(
-              get: { config.config.maxCacheDisk ?? "" },
-              set: { val in
-                let trimmed = val.trimmingCharacters(in: .whitespaces)
-                config.config.maxCacheDisk = trimmed.isEmpty ? nil : trimmed
+          HStack(spacing: 6) {
+            Picker(
+              "",
+              selection: Binding(
+                get: {
+                  if isCustomTier { return "custom" }
+                  return currentDiskVal
+                },
+                set: { val in
+                  if val == "custom" {
+                    if config.config.maxCacheDisk == nil || config.config.maxCacheDisk == "auto" {
+                      config.config.maxCacheDisk = "20G"
+                    }
+                  } else if val == "auto" {
+                    config.config.maxCacheDisk = nil
+                  } else {
+                    config.config.maxCacheDisk = val
+                  }
+                }
+              )
+            ) {
+              Text("Auto (Up to 32 GiB, Default)").tag("auto")
+              Text("Off (Disabled)").tag("0")
+              Text("5 GiB").tag("5G")
+              Text("10 GiB").tag("10G")
+              Text("16 GiB").tag("16G")
+              Text("32 GiB").tag("32G")
+              if isCustomTier {
+                Text("Custom (\(currentDiskVal))").tag("custom")
               }
-            )
-          )
-          .textFieldStyle(.roundedBorder)
-          .frame(width: 140, alignment: .trailing)
+            }
+            .pickerStyle(.menu)
+            .labelsHidden()
+            .frame(width: 190, alignment: .trailing)
+
+            if isCustomTier {
+              TextField(
+                "Size",
+                text: Binding(
+                  get: { config.config.maxCacheDisk ?? "" },
+                  set: { val in
+                    let trimmed = val.trimmingCharacters(in: .whitespaces)
+                    config.config.maxCacheDisk = trimmed.isEmpty ? nil : trimmed
+                  }
+                )
+              )
+              .textFieldStyle(.roundedBorder)
+              .frame(width: 70, alignment: .trailing)
+            }
+          }
         }
 
         // Persistent Disk Cache (Paired directly with Disk Cache Tier)
@@ -1149,8 +1213,11 @@ enum SettingsValidator {
   }
 
   static func diskTier(_ value: String?) -> Verdict? {
-    guard let value, !value.isEmpty, value != "0" else {
+    guard let value, !value.isEmpty, value != "0", value.lowercased() != "off" else {
       return Verdict(ok: true, text: "Disabled — cached KV pages stay in memory")
+    }
+    if value.lowercased() == "auto" {
+      return Verdict(ok: true, text: "Auto follows volume free space up to 32 GiB")
     }
     guard let verdict = memory(value, physical: nil) else { return nil }
     return Verdict(
@@ -1164,7 +1231,8 @@ enum SettingsValidator {
   /// non-zero tier: with none, the setting is inert, so its control is
   /// disabled rather than quietly accepting a value that does nothing.
   static func diskTierEnabled(_ value: String?) -> Bool {
-    guard let value, !value.isEmpty, value != "0" else { return false }
+    guard let value, !value.isEmpty, value != "0", value.lowercased() != "off" else { return false }
+    if value.lowercased() == "auto" { return true }
     return memory(value, physical: nil)?.ok ?? false
   }
 
