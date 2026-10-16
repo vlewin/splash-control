@@ -62,3 +62,39 @@ func missingContextFallsBackToHostTier() throws {
   let cfg = try JSONDecoder().decode(SplashConfig.self, from: Data("{}".utf8))
   #expect(cfg.maxContext == SplashConfig.defaultMaxContext(physicalGiB: HostMemory.physicalGiB))
 }
+
+@Test("saved stateFormat survives decode")
+func savedStateFormatSurvivesDecode() throws {
+  let cfg = try JSONDecoder().decode(SplashConfig.self, from: Data(#"{"stateFormat":"bf16"}"#.utf8))
+  #expect(cfg.stateFormat == "bf16")
+}
+
+@Test("buildLaunchArgs passes --state-format when supported and config sets it")
+func buildLaunchArgsStateFormat() {
+  var cfg = SplashConfig()
+  cfg.stateFormat = "bf16"
+  let supports: Set<String> = ["--state-format"]
+  let args = SplashProcess.buildLaunchArgs(cfg, supports: supports)
+  #expect(args.contains("--state-format"))
+  #expect(args.contains("bf16"))
+
+  // When flag is not supported by probed binary, it is dropped
+  let argsUnsupported = SplashProcess.buildLaunchArgs(cfg, supports: [])
+  #expect(!argsUnsupported.contains("--state-format"))
+}
+
+@Test("buildLaunchArgs passes --max-cache-disk for auto, explicit size, and 0")
+func buildLaunchArgsMaxCacheDisk() {
+  var cfg = SplashConfig()
+  cfg.maxCacheDisk = "auto"
+  #expect(SplashProcess.buildLaunchArgs(cfg).contains("auto"))
+
+  cfg.maxCacheDisk = "16G"
+  #expect(SplashProcess.buildLaunchArgs(cfg).contains("16G"))
+
+  cfg.maxCacheDisk = "0"
+  #expect(SplashProcess.buildLaunchArgs(cfg).contains("0"))
+
+  cfg.maxCacheDisk = ""
+  #expect(!SplashProcess.buildLaunchArgs(cfg).contains("--max-cache-disk"))
+}

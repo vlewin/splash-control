@@ -3,6 +3,15 @@
 help: ## show targets
 	@grep -E '^[a-z]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-12s %s\n", $$1, $$2}'
 
+# A toolchain that ships the Testing module and matching SPM (Apple's Command Line Tools do not).
+# `brew install swift` on Apple Silicon; override for other prefixes/installations.
+SWIFT_TOOLCHAIN ?= /opt/homebrew/opt/swift
+export PATH := $(SWIFT_TOOLCHAIN)/bin:$(PATH)
+
+# Default to installed release SDK when CLT SDK is mismatched with Swift compiler
+SDKROOT ?= $(shell [ -d /Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk ] && echo /Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk || xcrun --show-sdk-path)
+export SDKROOT
+
 build: ## compile inner loop
 	swift build
 
@@ -12,11 +21,8 @@ app: ## assemble dist/Splash.app
 check: ## script suites (core + agent-status)
 	bash Scripts/check_core.sh && bash Scripts/check_agent_status.sh
 
-# A toolchain that ships the Testing module (Apple's Command Line Tools do not).
-# `brew install swift` on Apple Silicon; override for other prefixes/installations.
-SWIFT_TOOLCHAIN ?= /opt/homebrew/opt/swift
 test: ## swift-testing suite (needs the Testing module, e.g. `brew install swift`)
-	PATH=$(SWIFT_TOOLCHAIN)/bin:$(PATH) swift test
+	swift test
 
 lint: ## formatter gate, zero warnings (strict)
 	xcrun swift-format lint --strict --recursive Sources
