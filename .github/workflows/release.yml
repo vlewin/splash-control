@@ -141,21 +141,3 @@ jobs:
           fi
         env:
           TAP_TOKEN: ${{ secrets.TAP_TOKEN }}
-
-      - name: Commit version bump to repository
-        if: ${{ steps.tag_version.outputs.new_tag }}
-        run: |
-          VERSION="${{ steps.tag_version.outputs.new_tag }}"
-          VERSION="${VERSION#v}"
-          BUILD="$(git rev-list --count HEAD)"
-          plutil -replace CFBundleShortVersionString -string "$VERSION" Resources/Info.plist
-          plutil -replace CFBundleVersion -string "$BUILD" Resources/Info.plist
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add Resources/Info.plist
-          if git diff --cached --quiet; then
-            echo "Info.plist already up to date."
-          else
-            git commit -m "chore(release): bump Info.plist to ${{ steps.tag_version.outputs.new_tag }} [skip ci]"
-            git push origin main
-          fi
