@@ -71,6 +71,13 @@ jobs:
             exit 1
           fi
 
+          # Verify: fail the release if the repo's Resources/Info.plist does not match the tag
+          REPO_VERSION=$(defaults read "$PWD/Resources/Info.plist" CFBundleShortVersionString)
+          if [ "$REPO_VERSION" != "$EXPECTED_VERSION" ]; then
+            echo "::error::Release version mismatch: Resources/Info.plist has '$REPO_VERSION', expected '$EXPECTED_VERSION'"
+            exit 1
+          fi
+
           cd dist
           zip -r "SplashControl-${{ steps.tag_version.outputs.new_tag }}.zip" Splash.app
           shasum -a 256 "SplashControl-${{ steps.tag_version.outputs.new_tag }}.zip" > "SplashControl-${{ steps.tag_version.outputs.new_tag }}.zip.sha256"
