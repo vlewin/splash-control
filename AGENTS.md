@@ -222,7 +222,8 @@ inherits a diff it cannot date.
 - Before marking a release-bearing PR ready for review:
   1. Confirm the branch is rebased on `main` (`merge-base == origin/main`).
   2. Determine the bump from branch commits since the last tag (`breaking` → major, `feat:` → minor, `fix:` → patch; highest wins).
-  3. Update `CFBundleShortVersionString` (and `CFBundleVersion` = commit count) in `Resources/Info.plist`.
+  3. Update `CFBundleShortVersionString` in `Resources/Info.plist`; `CFBundleVersion`
+     is stamped by `Scripts/make-app.sh` at bundle assembly, never by the bump commit.
   4. Commit as the final commit:
      `chore(release): bump Info.plist to vX.Y.Z [skip-release]`
 - The `[skip-release]` literal and `chore:` type are mandatory so CI's `github-tag-action` does not double-bump.
