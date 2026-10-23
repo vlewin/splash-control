@@ -79,8 +79,9 @@ only with explicit user approval.
       - Has `feat:` → bump MINOR
       - Has `fix:` → bump PATCH
       - Only `docs:`/`chore:`/`test:`/`refactor:` → DO NOT touch `Resources/Info.plist`.
-    - If release-bearing, update `CFBundleShortVersionString` and `CFBundleVersion`
-      in `Resources/Info.plist` and commit as the final commit:
+    - If release-bearing, update `CFBundleShortVersionString` in `Resources/Info.plist`
+      (`CFBundleVersion` is stamped by `Scripts/make-app.sh` at bundle assembly) and
+      commit as the final commit:
       `chore(release): bump Info.plist to vX.Y.Z [skip-release]`
     - Include expected release tag in PR description.
 12. **PR.** Description: issue link, root cause, verification evidence (test name /
