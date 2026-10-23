@@ -43,6 +43,12 @@ Release:
 - Commit prefixes predict the tag (`feat!`/`fix!` = major, `feat` = minor,
   `fix` = patch); `[skip-release]` only when the commit ships no changed bytes.
   Evaluate mixed PRs per commit and take the highest class among shipping commits.
+- Version bump consistency:
+  - If PR touches `Resources/Info.plist`: verify the bump commit is the final commit,
+    formatted as `chore(release): bump Info.plist to vX.Y.Z [skip-release]`, and the version
+    matches the expected bump computed from branch commits since the last tag.
+  - If PR is non-release (`docs:`, `chore:`, `test:`), verify `Resources/Info.plist` is untouched.
+  - If `origin/main` gained a new release tag since PR was opened, block merge and request rebase + re-bump.
 - PR does not push `main` or mint tags out of band.
 
 Hygiene (public repo):

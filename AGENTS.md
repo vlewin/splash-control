@@ -216,9 +216,18 @@ inherits a diff it cannot date.
 - Commit messages: subject under 72 chars, conventional prefix (`feat:`, `fix:`,
   `docs:`, `refactor:`, `chore:`, `style:`, `test:`), body explains the why.
   One concern per commit.
-- `Resources/Info.plist` (`CFBundleShortVersionString` + `CFBundleVersion`)
-  moves on release only, never per commit. A batch of verified changes lands
-  first; the version bump closes it.
+
+### Pre-merge version bump (release-bearing PRs only)
+- A PR is *release-bearing* if it contains `feat:`, `fix:`, or breaking (`!`) commits.
+- Before marking a release-bearing PR ready for review:
+  1. Confirm the branch is rebased on `main` (`merge-base == origin/main`).
+  2. Determine the bump from branch commits since the last tag (`breaking` → major, `feat:` → minor, `fix:` → patch; highest wins).
+  3. Update `CFBundleShortVersionString` (and `CFBundleVersion` = commit count) in `Resources/Info.plist`.
+  4. Commit as the final commit:
+     `chore(release): bump Info.plist to vX.Y.Z [skip-release]`
+- The `[skip-release]` literal and `chore:` type are mandatory so CI's `github-tag-action` does not double-bump.
+- Non-release PRs (`docs:`, `chore:`, `test:`, `refactor:` only) MUST NOT touch `Resources/Info.plist`.
+- If `main` gained a new release tag while the PR was in review: rebase, drop the stale bump commit, recompute the version, and re-commit.
 
 ## 12. Sources of truth
 
@@ -286,6 +295,8 @@ Reply with these eight sections, in this order. Do not reorder or omit:
 - Do not render an empty ring for "no data yet" — only for a down service.
 - Do not make two dot states differ only by blinking.
 - Do not put machine-specific paths, usernames or hardware in this file or any other reference doc.
+- Do not push version-bump commits directly to `main` (GH013). The bump lives in the PR branch.
+- Do not use `feat:` or `fix:` for a version bump commit; always use `chore(release): ... [skip-release]`.
 
 ### Ask first
 - SPM dependencies: none get added without explicit approval.
