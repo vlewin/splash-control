@@ -33,14 +33,11 @@ struct StatsView: View {
     ScrollView {
       VStack(spacing: 16) {
         // Nested Sub-Navigation (DESIGN.md Standard)
-        Picker("", selection: $subTab) {
-          ForEach(SubTab.allCases) { t in
-            Text(t.rawValue).tag(t)
-          }
-        }
-        .pickerStyle(.segmented)
-        .labelsHidden()
-        .frame(maxWidth: 320)
+        FixedSegmented(
+          width: 320, titles: SubTab.allCases.map(\.rawValue), values: SubTab.allCases,
+          selection: $subTab
+        )
+        .fixedSize()
         .padding(.top, 4)
 
         switch subTab {

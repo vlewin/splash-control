@@ -200,18 +200,13 @@ struct BenchSection: View {
               .font(.subheadline)
               .foregroundStyle(.secondary)
               .lineLimit(1)
-            Picker(
-              "Context",
+            FixedSegmented(
+              width: 228, titles: BenchRules.LongContext.options.map { "\($0)K" },
+              values: BenchRules.LongContext.options,
               selection: Binding(
                 get: { bench.longContextK },
                 set: { bench.setLongContext($0) })
-            ) {
-              ForEach(BenchRules.LongContext.options, id: \.self) {
-                Text("\($0)K").tag($0)
-              }
-            }
-            .labelsHidden()
-            .pickerStyle(.segmented)
+            )
             .frame(width: 228)
             .disabled(bench.phase != .idle && bench.phase != .done)
             .help("Size of the long-context scenario (KV cache stress test).")
@@ -222,15 +217,10 @@ struct BenchSection: View {
               .font(.subheadline)
               .foregroundStyle(.secondary)
               .lineLimit(1)
-            Picker(
-              "ANE",
+            FixedSegmented(
+              width: 100, titles: ["on", "off"], values: [true, false],
               selection: $bench.aneEnabled
-            ) {
-              Text("on").tag(true)
-              Text("off").tag(false)
-            }
-            .labelsHidden()
-            .pickerStyle(.segmented)
+            )
             .frame(width: 100)
             .disabled(bench.phase != .idle && bench.phase != .done)
             .help(

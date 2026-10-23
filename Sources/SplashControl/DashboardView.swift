@@ -771,20 +771,14 @@ struct DashboardView: View {
     }
     .toolbar {
       ToolbarItem(placement: .principal) {
-        Picker("View", selection: $navigation.selectedTab) {
-          Text("Live").tag(0)
-          Text("Metrics").tag(1)
-          Text("Statistics").tag(2)
-          Text("Logs").tag(3)
-          Text("Settings").tag(4)
-          Text("Info").tag(5)
-        }
-        .pickerStyle(.segmented)
-        .labelsHidden()
         // 530, not 440: six segments at the old width gave "Statistics"
         // ~73 pt, under its ~87 pt natural width, so the widest label is
         // the one that would have truncated.
-        .frame(width: 530)
+        FixedSegmented(
+          width: 530, titles: ["Live", "Metrics", "Statistics", "Logs", "Settings", "Info"],
+          values: [0, 1, 2, 3, 4, 5], selection: $navigation.selectedTab
+        )
+        .fixedSize()
       }
     }
   }
@@ -1019,14 +1013,11 @@ struct DashboardView: View {
         Text("Window:")
           .font(.subheadline.weight(.medium))
           .foregroundStyle(.secondary)
-        Picker("Chart window", selection: $config.config.windowMinutes) {
-          Text("15 min").tag(15)
-          Text("30 min").tag(30)
-          Text("1 h").tag(60)
-        }
-        .pickerStyle(.segmented)
-        .labelsHidden()
-        .frame(width: 210)
+        FixedSegmented(
+          width: 210, titles: ["15 min", "30 min", "1 h"], values: [15, 30, 60],
+          selection: $config.config.windowMinutes
+        )
+        .fixedSize()
       }
     }
   }
