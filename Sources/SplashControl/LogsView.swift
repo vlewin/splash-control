@@ -276,15 +276,12 @@ struct LogsView: View {
           .stroke(Color.primary.opacity(0.06), lineWidth: 0.5)
       )
       HStack(spacing: 6) {
-        Picker("Level", selection: $level) {
-          ForEach(Level.allCases) { l in
-            Text(l.label).tag(l)
-          }
-        }
-        .pickerStyle(.segmented)
-        .controlSize(.small)
-        .labelsHidden()
-        .frame(width: 400)
+        // Sized to its labels: an equal split truncates "Warnings & Errors".
+        FixedSegmented(
+          width: nil, titles: Level.allCases.map(\.label), values: Level.allCases,
+          selection: $level
+        )
+        .fixedSize()
 
         Spacer(minLength: 0)
         // Tail following is a viewport mode, not a query: keeping it
@@ -397,14 +394,11 @@ struct LogsView: View {
         // Channel switcher: the server stream and the tray's own lifecycle
         // log are both answers to "what happened", and forcing one of them
         // into Settings made the tray log effectively invisible.
-        Picker("", selection: $channel) {
-          ForEach(SplashLog.Channel.allCases, id: \.self) { c in
-            Text(c.filename).tag(c)
-          }
-        }
-        .pickerStyle(.segmented)
-        .labelsHidden()
-        .frame(width: 320)
+        FixedSegmented(
+          width: 320, titles: SplashLog.Channel.allCases.map(\.filename),
+          values: SplashLog.Channel.allCases, selection: $channel
+        )
+        .fixedSize()
         Spacer(minLength: 0)
         Button("Rotate") { confirmingRotate = true }
           .disabled(missing)

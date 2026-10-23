@@ -134,6 +134,12 @@ lint_check "256K row is gated on 64 GiB of unified memory" \
 lint_check "context row in Settings is a Picker, not a free-text field" \
     "grep -A 14 '\"Context Window\"' Sources/SplashControl/SettingsView.swift | grep -q 'Picker('"
 
+# 11. No SwiftUI segmented Picker. Each evaluation leaks an
+#     ObservationRegistrar (macOS 26); inline in a per-poll body that pinned
+#     the main thread at 100% CPU after days. Use FixedSegmented instead.
+lint_check "no SwiftUI segmented Picker (use FixedSegmented)" \
+    "! grep -rq 'pickerStyle(.segmented)' Sources/SplashControl"
+
 if [ "$lint_failures" -ne 0 ]; then
     echo ""
     echo "$lint_failures layout safety lint(s) FAILED. Aborting."
@@ -2190,6 +2196,7 @@ swiftc -O -o "$work/check" \
   Sources/SplashControl/ModelStats.swift \
   Sources/SplashControl/LogsView.swift \
   Sources/SplashControl/ContentHeight.swift \
+  Sources/SplashControl/FixedSegmented.swift \
   Sources/SplashControl/SettingsView.swift \
   Sources/SplashControl/HardwareTelemetry.swift \
   Sources/SplashControl/StatsModel.swift \

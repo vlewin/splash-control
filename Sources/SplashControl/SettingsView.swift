@@ -37,14 +37,11 @@ struct SettingsView: View {
     ScrollView {
       VStack(spacing: 12) {
         // Nested Sub-Navigation (DESIGN.md § 2.1)
-        Picker("", selection: $subTab) {
-          ForEach(SettingsSubTab.allCases) { tab in
-            Text(tab.rawValue).tag(tab)
-          }
-        }
-        .pickerStyle(.segmented)
-        .labelsHidden()
-        .frame(maxWidth: 380)
+        FixedSegmented(
+          width: 380, titles: SettingsSubTab.allCases.map(\.rawValue),
+          values: SettingsSubTab.allCases, selection: $subTab
+        )
+        .fixedSize()
         .padding(.top, 4)
 
         switch subTab {
@@ -1255,63 +1252,5 @@ enum SettingsValidator {
           : "Port \(value) is in use by another process")
     }
     return Verdict(ok: true, text: "Port is available")
-  }
-}
-
-// MARK: - Native Segmented Control
-
-/// Native segmented control with an explicit total width.
-///
-/// A SwiftUI segmented Picker cannot be sized or freely positioned inside a
-/// grouped Form: the Form columnizes Picker rows and NSSegmentedControl sizes
-/// to fit, so frames are defeated. This wraps NSSegmentedControl directly and
-/// pins every segment to an equal share of `width`. It is opaque to the Form,
-/// so it lays out as plain content (like the model menu Picker row).
-private struct FixedSegmented<Value: Hashable>: NSViewRepresentable {
-  let width: CGFloat
-  let titles: [String]
-  let values: [Value]
-  @Binding var selection: Value
-
-  func makeNSView(context: Context) -> NSSegmentedControl {
-    let control = NSSegmentedControl(
-      labels: titles,
-      trackingMode: .selectOne,
-      target: context.coordinator,
-      action: #selector(Coordinator.changed(_:))
-    )
-    for i in titles.indices {
-      control.setWidth(width / CGFloat(titles.count), forSegment: i)
-    }
-    return control
-  }
-
-  func updateNSView(_ control: NSSegmentedControl, context: Context) {
-    context.coordinator.sync(control: control, selection: selection)
-  }
-
-  func makeCoordinator() -> Coordinator {
-    Coordinator(values: values, selection: $selection)
-  }
-
-  final class Coordinator: NSObject {
-    let values: [Value]
-    var selection: Binding<Value>
-
-    init(values: [Value], selection: Binding<Value>) {
-      self.values = values
-      self.selection = selection
-    }
-
-    @objc func changed(_ sender: NSSegmentedControl) {
-      guard sender.selectedSegment >= 0 else { return }
-      selection.wrappedValue = values[sender.selectedSegment]
-    }
-
-    func sync(control: NSSegmentedControl, selection: Value) {
-      if let i = values.firstIndex(of: selection), control.selectedSegment != i {
-        control.selectedSegment = i
-      }
-    }
   }
 }
