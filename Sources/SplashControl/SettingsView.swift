@@ -556,6 +556,8 @@ struct SettingsView: View {
     card("Streaming stores (MoE / Flash-Next)") {
       storeRow(
         "Expert RAM", $config.config.expertMemory, placeholder: "16G", allowOff: true,
+        live: SettingsValidator.expertAuto(
+          config.config.expertMemory, store: stats.latest?.streamedExperts),
         help:
           "RAM slots for the routed experts of a MoE model (--expert-memory). Auto loads every expert where memory holds them, otherwise what the context leaves; off loads them all. splash 1.4.0+."
       )
@@ -602,10 +604,11 @@ struct SettingsView: View {
     _ field: Binding<String?>,
     placeholder: String,
     allowOff: Bool,
+    live: SettingsValidator.Verdict? = nil,
     help: String
   ) -> some View {
     let value = field.wrappedValue
-    let verdict = SettingsValidator.storeSize(value, allowOff: allowOff)
+    let verdict = live ?? SettingsValidator.storeSize(value, allowOff: allowOff)
     let warning = verdict?.ok == false ? verdict?.text : nil
     let subtitle = verdict?.text ?? "Auto — engine decides from the memory budget"
     return formRow(title, subtitle, warning: warning, help: help) {
@@ -1307,6 +1310,23 @@ enum SettingsValidator {
       return Verdict(ok: false, text: "Expected a size like 12G, or auto")
     }
     return Verdict(ok: true, text: "RAM reserved for the store")
+  }
+
+  /// `--expert-memory` left on auto while the running server streams its
+  /// experts: auto then hands the arena everything the floors leave, and a
+  /// long prompt's history staging can be refused (`capacity_exhausted`).
+  /// nil when the row is set, or the experts all fit, or there is no store.
+  static func expertAuto(_ value: String?, store: StatusDTO.StreamedExperts?) -> Verdict? {
+    let raw = value?.trimmingCharacters(in: .whitespaces).lowercased() ?? ""
+    guard raw.isEmpty || raw == "auto", let slots = store?.slots, let experts = store?.experts,
+      experts > 0, slots < experts
+    else { return nil }
+    let percent = Int((Double(slots) / Double(experts) * 100).rounded())
+    let arena =
+      store?.arenaBytes.map { String(format: " in %.0fG", Double($0) / 1_073_741_824) } ?? ""
+    return Verdict(
+      ok: false,
+      text: "Auto holds \(percent)% of experts\(arena) — set a smaller size or raise Max Memory")
   }
 
   static func diskTier(_ value: String?) -> Verdict? {

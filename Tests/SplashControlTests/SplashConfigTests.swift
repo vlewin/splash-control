@@ -1,4 +1,5 @@
 import Foundation
+import SplashControlKit
 import Testing
 
 @testable import SplashControl
@@ -154,4 +155,17 @@ func freshMemoryAndDiskFollowPreset() {
 func savedAutoDiskTierSurvivesDecode() throws {
   let cfg = try JSONDecoder().decode(SplashConfig.self, from: Data("{}".utf8))
   #expect(cfg.maxCacheDisk == nil)
+}
+
+@Test("expert RAM on auto warns only while the live store streams")
+func expertAutoWarning() throws {
+  var store = try JSONDecoder().decode(
+    StatusDTO.StreamedExperts.self,
+    from: Data(#"{"arena_bytes":28140158976,"slots":20356,"experts":24576}"#.utf8))
+  #expect(SettingsValidator.expertAuto(nil, store: store)?.ok == false)
+  #expect(SettingsValidator.expertAuto("auto", store: store)?.text.contains("83%") == true)
+  #expect(SettingsValidator.expertAuto("24G", store: store) == nil)
+  store.slots = 24576
+  #expect(SettingsValidator.expertAuto(nil, store: store) == nil)
+  #expect(SettingsValidator.expertAuto(nil, store: nil) == nil)
 }
