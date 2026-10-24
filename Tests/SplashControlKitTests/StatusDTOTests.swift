@@ -108,3 +108,13 @@ func memoryReleaseReplyDecodes() throws {
   #expect(res.weights?.released == true)
   #expect(res.weights?.idleReleaseSeconds == 1800)
 }
+
+@Test("1.4.0 fixture decodes the streamed-expert store")
+func status140FixtureDecodes() throws {
+  let s = try JSONDecoder().decode(StatusDTO.self, from: try fixture("status_schema6_1_4_0.json"))
+  #expect(s.ready == true)
+  // Shape pins, not values: a recapture on another machine may differ.
+  #expect(s.streamedExperts?.arenaBytes != nil)
+  #expect(s.streamedExperts?.slots != nil)
+  #expect(s.streamedExperts?.experts != nil)
+}
