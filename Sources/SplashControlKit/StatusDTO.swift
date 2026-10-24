@@ -1,10 +1,11 @@
 import Foundation
 
-/// Codable mirror of `GET /status` as served by splash 1.2.0–1.3.2 (`schema_version 6`).
+/// Codable mirror of `GET /status` as served by splash 1.2.0–1.4.0 (`schema_version 6`).
 /// Optional everywhere the server may omit a key; consumers must tolerate nils.
 /// Keys this DTO does not model yet (`latency`, `frontend`, `response_store`,
 /// `image_cache`, `grammar_cache`, `model_timing`, `draft_context`, `warmup`,
-/// `http`, `images`, `memory_audit`, `constraint_masks`, `loop`) are ignored by
+/// `http`, `images`, `memory_audit`, `constraint_masks`, `loop`, and 1.4.0's
+/// `verify_rows`, `streamed_table`, `kv_spill`) are ignored by
 /// Codable. `recent_requests` is absent from every release to date — keep it
 /// optional.
 ///

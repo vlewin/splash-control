@@ -66,10 +66,11 @@ The installed runtime is the Homebrew stable release `incoai/tap/splash` (`/opt/
   - `latency.ttft` → `latency.http_ttft` (`splash_http_ttft_seconds` in `/metrics`)
   - New section in 1.2.1: `weights` (`idle_release_seconds`, `released`, `restores`).
 - `StatusDTO` must stay an **all-optional subset**: keys a release predates stay optional.
-- Supported splash range (tested-against, shown in the Info tab): **1.2.0 – 1.3.2**. Keep in sync with `InfoView.supportedSplash`. 1.3.2's `/status` is still schema 6 (8 is its native wire protocol, which this app never speaks).
+- Supported splash range (tested-against, shown in the Info tab): **1.2.0 – 1.4.0**. Keep in sync with `InfoView.supportedSplash`. 1.4.0's `/status` is still schema 6 (11 is its native wire protocol, which this app never speaks).
 - 1.3.0 adds `ane_ffn` (the Neural Engine prefill-FFN split; 8 keys, all optional in the DTO). `admission.held_behind_refusal`/`restoring` are schema-6 keys (on the wire since 1.2.0) the DTO never mirrored until now; they are admission's own marks, not sub-counters of `waiting`.
 - 1.3.1 adds `thermal_state` at root `/status` (macOS thermal throttling status: nominal/fair/serious/critical), `weights.restore_failures` (memory restore failures/timeouts after idle release), and `state.idle_context_windows`. Legacy Splash packages (`incoai/Qwen3.8-27B-Splash`) are deprecated upstream in favor of MLX targets (`mlx-community/Qwen3.8-27B-4bit`).
 - 1.3.2 adds `active_requests` (live in-flight request array with prompt/generation progress and phase), `weights.restoring` (boolean indicating active weight restoration into memory), `memory_plan.model.state_format` (`fp32` | `bf16`), governor host spare telemetry (`host_spare_bytes`, `host_spare_reserve_bytes`), dynamic disk limit/gating (`limit_bytes`, `volume_available_bytes`, `writes_gated`, `write_budget_bytes`), and `cache.deduplicated_kv_tokens`.
+- 1.4.0 adds no removed or renamed keys — 106 additive keys only, none of them required by the DTO. The four the tray reads nothing from yet are root-level `verify_rows` (`auto` | `all`), `streamed_experts`, `streamed_table`, and `kv_spill`. Its new spawn flags are `--expert-memory`, `--ple-memory`, `--sparse-kv-memory` (all `auto`, a size, or — for the first two — `off`) and `--verify-rows auto|all`. `--max-context` now accepts `M` as a **million** (not a mebibyte) up to `MAX_YARN_CONTEXT_TOKENS` = 1,010,000; above the 262,144 native window the engine applies static YaRN, which changes output at every length. `--max-cache-disk` auto became a quarter of volume free space beyond a 10G floor (5% under 200G), still capped at 32G.
 
 ### 4.2 Model acceptance
 `splash serve --model owner/repo[:VARIANT]` resolves targets from metadata alone (`config.json` or GGUF header).
@@ -98,11 +99,13 @@ A status query that times out under heavy GPU work returns the last snapshot wit
 
 ### 4.6 `splash serve` CLI surface
 The argument parser is strict (`parse_args`); an unknown flag causes an immediate crash-loop (exit 2).
-`SplashProcess.buildLaunchArgs` passes 18 supported flags (`--model`, `--port`, `--max-memory`, `--max-context`, `--kv-format`, `--state-format`, `--max-cache-disk`, `--allowed-host`, `--max-request-size`, `--max-image-pixels`, `--api-key`, `--no-webui`, `--language-only`, `--persistent-cache`, `--idle-release`, `--served-model-name`, `--announce-served-name`, `--default-reasoning-effort`).
+`SplashProcess.buildLaunchArgs` passes 22 supported flags (`--model`, `--port`, `--max-memory`, `--max-context`, `--kv-format`, `--state-format`, `--max-cache-disk`, `--allowed-host`, `--max-request-size`, `--max-image-pixels`, `--api-key`, `--no-webui`, `--language-only`, `--persistent-cache`, `--idle-release`, `--served-model-name`, `--announce-served-name`, `--default-reasoning-effort`, `--expert-memory`, `--ple-memory`, `--sparse-kv-memory`, `--verify-rows`).
 
 Flag rules:
 - `--state-format` (1.3.2+) accepts `fp32` (default) or `bf16` (halves recurrent-state storage).
-- `--max-cache-disk` (1.3.2+) defaults to `auto` (up to 32G), `0` explicitly disables.
+- `--max-cache-disk` (1.3.2+) defaults to `auto`, `0` explicitly disables. From 1.4.0 auto is a quarter of volume free space beyond a 10G floor, at most 32G.
+- `--expert-memory` / `--ple-memory` (1.4.0+) take `auto`, a size, or `off`; `--sparse-kv-memory` (1.4.0+) takes `auto` or a size, never below the store's floor.
+- `--verify-rows` (1.4.0+) takes `auto` (faster, MoE output varies run to run) or `all` (reproducible).
 - `--persistent-cache` (1.2.0+) strictly requires SSD cache not turned off with `--max-cache-disk 0`.
 - `--idle-release` accepts only `off` or numbers with single `s`/`m`/`h` suffix (`15` = 15 seconds).
 - `extraArgs` cannot pass request parameters (e.g. `--temperature` will crash-loop).

@@ -38,8 +38,8 @@ func contextRowsBelowGate() {
 @Test("the 256K cap row is offered only to 64 GiB hosts and up")
 func contextRowGate() {
   #expect(SplashConfig.contextChoices(physicalGiB: 63.9) == ["32K", "64K", "128K"])
-  #expect(SplashConfig.contextChoices(physicalGiB: 64) == ["32K", "64K", "128K", "256K"])
-  #expect(SplashConfig.contextChoices(physicalGiB: 128) == ["32K", "64K", "128K", "256K"])
+  #expect(SplashConfig.contextChoices(physicalGiB: 64) == ["32K", "64K", "128K", "256K", "512K", "1M"])
+  #expect(SplashConfig.contextChoices(physicalGiB: 128) == ["32K", "64K", "128K", "256K", "512K", "1M"])
 }
 
 @Test("fresh default follows the recommended preset tier")
@@ -97,6 +97,50 @@ func buildLaunchArgsMaxCacheDisk() {
 
   cfg.maxCacheDisk = ""
   #expect(!SplashProcess.buildLaunchArgs(cfg).contains("--max-cache-disk"))
+}
+
+// splash 1.4.0: streaming stores (--expert-memory, --ple-memory,
+// --sparse-kv-memory), draft verification, and the 1M context ceiling.
+@Test("store sizes that splash accepts pass the launcher's sanitizer")
+func storeSizesThatSplashAccepts() {
+  #expect(SplashProcess.sanitizedStoreSize("16G", allowOff: true) == "16G")
+  #expect(SplashProcess.sanitizedStoreSize("2.5G", allowOff: true) == "2.5G")
+  #expect(SplashProcess.sanitizedStoreSize("1200M", allowOff: false) == "1200M")
+  #expect(SplashProcess.sanitizedStoreSize("512K", allowOff: false) == "512K")
+  #expect(SplashProcess.sanitizedStoreSize("off", allowOff: true) == "off")
+  #expect(SplashProcess.sanitizedStoreSize("auto", allowOff: true) == nil)
+}
+
+@Test("store sizes splash would reject are dropped, not forwarded")
+func storeSizesThatSplashRejects() {
+  // Each of these is an argparse exit 2: a dead server, not a warning.
+  #expect(SplashProcess.sanitizedStoreSize("16Gx", allowOff: true) == nil)
+  #expect(SplashProcess.sanitizedStoreSize(".5G", allowOff: true) == nil)
+  #expect(SplashProcess.sanitizedStoreSize("0", allowOff: true) == nil)
+  #expect(SplashProcess.sanitizedStoreSize("16 G", allowOff: true) == nil)
+  #expect(SplashProcess.sanitizedStoreSize("off", allowOff: false) == nil)
+}
+
+@Test("the 1.4.0 flags are gated on the probed binary like every other one")
+func streamingFlagsGate() {
+  var cfg = SplashConfig()
+  cfg.expertMemory = "16G"
+  cfg.verifyRows = "all"
+  let supports: Set<String> = ["--expert-memory", "--verify-rows"]
+  let args = SplashProcess.buildLaunchArgs(cfg, supports: supports)
+  #expect(args.contains("--expert-memory"))
+  #expect(args.contains("16G"))
+  #expect(args.contains("--verify-rows"))
+  #expect(!SplashProcess.buildLaunchArgs(cfg, supports: []).contains("--expert-memory"))
+  cfg.verifyRows = "turbo"
+  #expect(!SplashProcess.buildLaunchArgs(cfg, supports: supports).contains("--verify-rows"))
+}
+
+@Test("the context validator reads M as a million, not a mebibyte")
+func contextCeiling() {
+  #expect(SettingsValidator.context("1M")?.text == "Window: 1000000 tokens")
+  #expect(SettingsValidator.context("1.1M")?.ok == false)
+  #expect(SettingsValidator.context("512K")?.ok == true)
 }
 
 @Test("a fresh install takes the recommended preset's memory and disk tier")

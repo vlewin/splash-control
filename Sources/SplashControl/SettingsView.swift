@@ -17,6 +17,7 @@ struct SettingsView: View {
 
   enum SettingsSubTab: String, CaseIterable, Identifiable {
     case server = "Server Limits"
+    case streaming = "Streaming Stores"
     case behavior = "App Behavior"
     case advanced = "Advanced"
 
@@ -38,7 +39,7 @@ struct SettingsView: View {
       VStack(spacing: 12) {
         // Nested Sub-Navigation (DESIGN.md § 2.1)
         FixedSegmented(
-          width: 380, titles: SettingsSubTab.allCases.map(\.rawValue),
+          width: 460, titles: SettingsSubTab.allCases.map(\.rawValue),
           values: SettingsSubTab.allCases, selection: $subTab
         )
         .fixedSize()
@@ -48,6 +49,8 @@ struct SettingsView: View {
         case .server:
           presetsCard
           serverCard
+        case .streaming:
+          streamingCard
         case .behavior:
           lifecycleCard
         case .advanced:
@@ -347,7 +350,7 @@ struct SettingsView: View {
         formRow(
           "Context Window", ctxSubtitle, warning: ctxWarning,
           help:
-            "The enforced context window. Keep it equal to what your client caps at, or a request is rejected before it reaches the engine. Auto lets the engine decide; 256K, the server's cap, is offered only on hosts with 64 GiB or more of unified memory."
+            "The enforced context window. Keep it equal to what your client caps at, or a request is rejected before it reaches the engine. Auto lets the engine decide; 256K is the model's native window, and the rows above it (512K, 1M) stretch it with YaRN, which changes output at every length. Those rows are offered only on hosts with 64 GiB or more of unified memory."
         ) {
           Picker(
             "",
@@ -541,6 +544,83 @@ struct SettingsView: View {
             "Preserves the prefix KV cache on disk between server restarts. Requires a disk cache tier to be configured."
         )
       }
+    }
+  }
+
+  // Streaming stores (splash 1.4.0+). The engine splits one memory budget
+  // between weights, context and these caches; a store smaller than what fits
+  // is read from the SSD tier instead of failing. Separate card, not a new
+  // sub-tab: they are the same job as the limits above (sizing the engine's
+  // RAM), only for MoE and Flash-Next targets.
+  private var streamingCard: some View {
+    card("Streaming stores (MoE / Flash-Next)") {
+      storeRow(
+        "Expert RAM", $config.config.expertMemory, placeholder: "16G", allowOff: true,
+        help:
+          "RAM slots for the routed experts of a MoE model (--expert-memory). Auto loads every expert where memory holds them, otherwise what the context leaves; off loads them all. splash 1.4.0+."
+      )
+      storeRow(
+        "PLE RAM", $config.config.pleMemory, placeholder: "2G", allowOff: true,
+        help:
+          "RAM row cache of a Qwen3.8-Flash-Next PLE n-gram table (--ple-memory); the rest streams from the SSD. off loads the whole table, tens of GB. splash 1.4.0+."
+      )
+      storeRow(
+        "Sparse KV RAM", $config.config.sparseKvMemory, placeholder: "1200M", allowOff: false,
+        help:
+          "RAM cache of the KV blocks a block-sparse model reads back from the SSD tier (--sparse-kv-memory). splash 1.4.0+."
+      )
+      formRow(
+        "Draft Verification",
+        config.config.verifyRows == "all"
+          ? "All rows — reproducible output"
+          : "Auto — a learned budget, faster",
+        help:
+          "Rows of each draft block the engine decodes verifies (--verify-rows). auto is faster but a MoE model's greedy output then differs run to run; all repeats. splash 1.4.0+."
+      ) {
+        Picker(
+          "",
+          selection: Binding(
+            get: { config.config.verifyRows ?? "auto" },
+            set: { config.config.verifyRows = $0 == "auto" ? nil : $0 }
+          )
+        ) {
+          Text("Auto (Default)").tag("auto")
+          Text("All (Reproducible)").tag("all")
+        }
+        .pickerStyle(.menu)
+        .labelsHidden()
+        .frame(width: 190, alignment: .trailing)
+      }
+    }
+  }
+
+  /// One size field for the streaming-store flags, with the verdict coming from
+  /// the same sanitizer the launcher uses so a typo shows here rather than as a
+  /// flag the spawn silently dropped.
+  private func storeRow(
+    _ title: String,
+    _ field: Binding<String?>,
+    placeholder: String,
+    allowOff: Bool,
+    help: String
+  ) -> some View {
+    let value = field.wrappedValue
+    let verdict = SettingsValidator.storeSize(value, allowOff: allowOff)
+    let warning = verdict?.ok == false ? verdict?.text : nil
+    let subtitle = verdict?.text ?? "Auto — engine decides from the memory budget"
+    return formRow(title, subtitle, warning: warning, help: help) {
+      TextField(
+        placeholder,
+        text: Binding(
+          get: { value ?? "" },
+          set: { val in
+            let trimmed = val.trimmingCharacters(in: .whitespaces)
+            field.wrappedValue = trimmed.isEmpty ? nil : trimmed
+          }
+        )
+      )
+      .textFieldStyle(.roundedBorder)
+      .frame(width: 140, alignment: .trailing)
     }
   }
 
@@ -1196,7 +1276,8 @@ enum SettingsValidator {
       guard let m = Double(lower.dropLast()) else {
         return Verdict(ok: false, text: "Expected a count like 1M")
       }
-      tokens = m * 1024 * 1024
+      // splash's parser reads M as a million, not as a mebibyte.
+      tokens = m * 1_000_000
     } else {
       guard let n = Double(lower) else {
         return Verdict(ok: false, text: "Expected a count like 128K or 262144")
@@ -1206,7 +1287,26 @@ enum SettingsValidator {
     guard tokens >= 4096 else {
       return Verdict(ok: false, text: "Below 4K tokens — no request would fit")
     }
+    guard tokens <= 1_010_000 else {
+      return Verdict(
+        ok: false,
+        text: "Above 1010K — the server's YaRN ceiling; splash refuses it at launch")
+    }
     return Verdict(ok: true, text: "Window: " + String(Int(tokens)) + " tokens")
+  }
+
+  /// `--expert-memory`, `--ple-memory` and `--sparse-kv-memory`. The verdict
+  /// comes from `SplashProcess.sanitizedStoreSize`, the same function the
+  /// launcher uses, so the UI cannot disagree with what gets passed.
+  static func storeSize(_ value: String?, allowOff: Bool) -> Verdict? {
+    guard let value, !value.isEmpty else { return nil }
+    if value.trimmingCharacters(in: .whitespaces).lowercased() == "auto" {
+      return Verdict(ok: true, text: "Auto — engine plans the store")
+    }
+    guard SplashProcess.sanitizedStoreSize(value, allowOff: allowOff) != nil else {
+      return Verdict(ok: false, text: "Expected a size like 12G, or auto")
+    }
+    return Verdict(ok: true, text: "RAM reserved for the store")
   }
 
   static func diskTier(_ value: String?) -> Verdict? {

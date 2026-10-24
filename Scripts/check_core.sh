@@ -140,6 +140,12 @@ lint_check "context row in Settings is a Picker, not a free-text field" \
 lint_check "no SwiftUI segmented Picker (use FixedSegmented)" \
     "! grep -rq 'pickerStyle(.segmented)' Sources/SplashControl"
 
+# 12. The 1.4.0 streaming-store flags are gated on the probed binary: an
+#     older splash rejects them under strict parse_args (crash-loop), so
+#     nothing may pass them without the --help probe advertising them.
+lint_check "streaming store flags are probe-gated" \
+    "grep -q 'supports.contains(\"--expert-memory\")' Sources/SplashControl/SplashProcess.swift"
+
 if [ "$lint_failures" -ne 0 ]; then
     echo ""
     echo "$lint_failures layout safety lint(s) FAILED. Aborting."
@@ -773,8 +779,8 @@ check("default context on an unknown host takes the small end",
       SplashConfig.defaultMaxContext(physicalGiB: nil), "64K")
 checkEq("picker rows: the base set below the 256K gate", SplashConfig.contextChoices(physicalGiB: 48),
         ["32K", "64K", "128K"])
-checkEq("a 64 GiB host gets the 256K cap row", SplashConfig.contextChoices(physicalGiB: 64),
-        ["32K", "64K", "128K", "256K"])
+checkEq("a 64 GiB host gets the 256K cap and the YaRN rows", SplashConfig.contextChoices(physicalGiB: 64),
+        ["32K", "64K", "128K", "256K", "512K", "1M"])
 checkNil("config default kvFormat nil (flag omitted)", empty.kvFormat)
 checkNil("config default maxCacheDisk nil (flag omitted)", empty.maxCacheDisk)
 
@@ -786,6 +792,14 @@ let tuned = try! JSONDecoder().decode(SplashConfig.self,
     from: Data(#"{"kvFormat":"bf16","maxCacheDisk":"5G"}"#.utf8))
 check("kvFormat round-trips", tuned.kvFormat, "bf16")
 check("maxCacheDisk round-trips", tuned.maxCacheDisk, "5G")
+
+// The 1.4.0 keys must decode from a file written by this version and stay nil
+// in one written by an older version.
+let storeFile = try! JSONDecoder().decode(SplashConfig.self,
+    from: Data(#"{"expertMemory":"16G","pleMemory":"2G","sparseKvMemory":"1200M","verifyRows":"all"}"#.utf8))
+check("expertMemory round-trips", storeFile.expertMemory, "16G")
+check("verifyRows round-trips", storeFile.verifyRows, "all")
+checkNil("a pre-1.4.0 file keeps the store keys nil", empty.expertMemory)
 
 // A Settings edit must survive save(): ConfigStore.save encodes this struct, so
 // a field that fails to appear in the JSON is a silently-lost preference.
@@ -1018,6 +1032,40 @@ check("languageOnly survives a save/load round-trip",
           SplashProcess.buildLaunchArgs({ var z = SplashConfig(); z.announceServedName = true; return z }(), supports: ["--served-model-name"]).contains("--announce-served-name"), false)
     check("gated: announce defaults on with the default name",
           SplashProcess.buildLaunchArgs(SplashConfig(), supports: alias).contains("--announce-served-name"), true)
+
+    // splash 1.4.0 streaming stores and draft verification: same crash-loop
+    // gate (an older binary rejects the flag outright) and the same strict
+    // parser risk (a malformed size is an argparse exit 2, not a warning).
+    let stores: Set<String> = ["--expert-memory", "--ple-memory", "--sparse-kv-memory", "--verify-rows"]
+    func withStores() -> SplashConfig {
+        var z = SplashConfig()
+        z.expertMemory = "16G"
+        z.pleMemory = "2G"
+        z.sparseKvMemory = "1200M"
+        z.verifyRows = "all"
+        return z
+    }
+    check("gated: the four 1.4.0 flags pass when advertised",
+          SplashProcess.buildLaunchArgs(withStores(), supports: stores)
+              .filter { stores.contains($0) }.sorted(),
+          ["--expert-memory", "--ple-memory", "--sparse-kv-memory", "--verify-rows"])
+    check("gated: they are dropped when the probe found nothing",
+          SplashProcess.buildLaunchArgs(withStores(), supports: [])
+              .filter { stores.contains($0) }, [])
+    check("gated: store sizes carry their values",
+          SplashProcess.buildLaunchArgs(withStores(), supports: stores).contains("1200M"), true)
+    check("gated: verify-rows outside the closed set is refused",
+          SplashProcess.buildLaunchArgs({ var z = SplashConfig(); z.verifyRows = "turbo"; return z }(),
+                                        supports: stores).contains("--verify-rows"), false)
+    func store(_ v: String?, _ off: Bool) -> String? { SplashProcess.sanitizedStoreSize(v, allowOff: off) }
+    check("store size: units, fractions and bytes all pass",
+          [store("16G", true), store("2.5G", true), store("1200M", false), store("512K", false), store("12GB", true)].map { $0! },
+          ["16G", "2.5G", "1200M", "512K", "12GB"])
+    check("store size: auto means pass nothing", [store("auto", true), store("AUTO", false)], [nil, nil])
+    check("store size: off only where the flag allows it", [store("off", true), store("off", false)], ["off", nil])
+    check("store size: garbage is refused",
+          [store("abc", true), store("16Gx", true), store("0", true), store(".5G", true), store("16 G", true)],
+          [nil, nil, nil, nil, nil])
 
     // `--idle-release` has a strict parser: `abc`, `15x` and `1h30m` each abort
     // startup with exit 2 (measured against the installed binary). A typo is a
