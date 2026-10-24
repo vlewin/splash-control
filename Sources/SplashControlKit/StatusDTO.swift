@@ -47,6 +47,9 @@ public struct StatusDTO: Codable, Equatable {
   public var aneFfn: AneFfn?
   /// splash 1.3.2+: live in-flight request snapshots.
   public var activeRequests: [ActiveRequest]?
+  /// splash 1.4.0+: the routed-expert store of a MoE target. Absent for a
+  /// dense model and on older releases.
+  public var streamedExperts: StreamedExperts?
 
   public enum CodingKeys: String, CodingKey {
     case ready
@@ -61,6 +64,7 @@ public struct StatusDTO: Codable, Equatable {
     case kv, state, cache, identity, disk, weights
     case aneFfn = "ane_ffn"
     case activeRequests = "active_requests"
+    case streamedExperts = "streamed_experts"
   }
 
   /// splash 1.3.2+: Live request snapshot from `/status.active_requests`.
@@ -136,6 +140,19 @@ public struct StatusDTO: Codable, Equatable {
       case minimumRows = "minimum_rows"
       case splitCommands = "split_commands"
       case aneMs = "ane_ms"
+    }
+  }
+
+  /// splash 1.4.0+. `slots < experts` means the store streams: only that many
+  /// experts stay resident and the rest are read from the SSD as tokens
+  /// route them.
+  public struct StreamedExperts: Codable, Equatable {
+    public var arenaBytes: UInt64?
+    public var slots: Int?
+    public var experts: Int?
+    public enum CodingKeys: String, CodingKey {
+      case slots, experts
+      case arenaBytes = "arena_bytes"
     }
   }
 

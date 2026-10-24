@@ -5,8 +5,9 @@ import Foundation
 struct SplashConfig: Codable, Equatable {
   var model: String = "mlx-community/Qwen3.8-27B-4bit"
   var port: Int = 8000  // splash's own default; matches a vanilla `splash serve`
-  /// e.g. "28G" — passed to `splash serve --max-memory`; nil = auto
-  var maxMemory: String? = "58G"  // this Mac: auto would resolve to 58G anyway
+  /// e.g. "28G" — passed to `splash serve --max-memory`; nil = auto. A fresh
+  /// install takes the host's recommended tier, like `maxContext`.
+  var maxMemory: String? = HardwarePreset.recommended(physicalGiB: HostMemory.physicalGiB).maxMemory
   /// e.g. "100K" — passed to `splash serve --max-context`; nil = auto. A fresh
   /// install takes the host's recommended tier, so the default agrees with the
   /// preset card (issue #8).
@@ -15,8 +16,10 @@ struct SplashConfig: Codable, Equatable {
   var kvFormat: String? = nil
   /// "fp32" or "bf16" — `splash serve --state-format`; nil = fp32 (server default)
   var stateFormat: String? = nil
-  /// e.g. "5G", "auto", or "0" — `splash serve --max-cache-disk` SSD tier; nil/auto = auto (default)
-  var maxCacheDisk: String? = nil
+  /// e.g. "5G", "auto", or "0" — `splash serve --max-cache-disk` SSD tier; nil/auto = auto.
+  /// A fresh install takes the host's recommended tier.
+  var maxCacheDisk: String? =
+    HardwarePreset.recommended(physicalGiB: HostMemory.physicalGiB).maxCacheDisk
   /// Keep the SSD tier's conversation prefixes across restarts
   /// (`splash serve --persistent-cache`). Needs a non-zero `maxCacheDisk`.
   /// splash 1.2.0+ only; omitted entirely on an older binary.
@@ -151,7 +154,9 @@ struct SplashConfig: Codable, Equatable {
     maxContext = try c.decodeIfPresent(String.self, forKey: .maxContext) ?? d.maxContext
     kvFormat = try c.decodeIfPresent(String.self, forKey: .kvFormat) ?? d.kvFormat
     stateFormat = try c.decodeIfPresent(String.self, forKey: .stateFormat) ?? d.stateFormat
-    maxCacheDisk = try c.decodeIfPresent(String.self, forKey: .maxCacheDisk) ?? d.maxCacheDisk
+    // No fallback to the default: nil (auto) is encoded as an absent key, so a
+    // saved auto tier must not turn into the fresh-install tier on decode.
+    maxCacheDisk = try c.decodeIfPresent(String.self, forKey: .maxCacheDisk)
     persistentCache =
       try c.decodeIfPresent(Bool.self, forKey: .persistentCache) ?? d.persistentCache
     idleRelease = try c.decodeIfPresent(String.self, forKey: .idleRelease) ?? d.idleRelease

@@ -98,3 +98,16 @@ func buildLaunchArgsMaxCacheDisk() {
   cfg.maxCacheDisk = ""
   #expect(!SplashProcess.buildLaunchArgs(cfg).contains("--max-cache-disk"))
 }
+
+@Test("a fresh install takes the recommended preset's memory and disk tier")
+func freshMemoryAndDiskFollowPreset() {
+  let rec = HardwarePreset.recommended(physicalGiB: HostMemory.physicalGiB)
+  #expect(SplashConfig().maxMemory == rec.maxMemory)
+  #expect(SplashConfig().maxCacheDisk == rec.maxCacheDisk)
+}
+
+@Test("a saved auto disk tier (absent key) stays auto on decode")
+func savedAutoDiskTierSurvivesDecode() throws {
+  let cfg = try JSONDecoder().decode(SplashConfig.self, from: Data("{}".utf8))
+  #expect(cfg.maxCacheDisk == nil)
+}

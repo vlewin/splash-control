@@ -207,7 +207,8 @@ let full = dto("""
  "weights":{"idle_release_seconds":600,"released":false,"restores":2},
  "ane_ffn":{"state":"split","share":0.41,"minimum_rows":640,"reason":"r","split_commands":3,
   "reruns":1,"ane_ms":1234.5,"evaluations":192},
- "active_requests":[{"id":101,"phase":"prefill","prompt_tokens":100}]}
+ "active_requests":[{"id":101,"phase":"prefill","prompt_tokens":100}],
+ "streamed_experts":{"arena_bytes":28140158976,"slots":20356,"experts":24576}}
 """)
 
 // BUG-9 guard, generalised. This has now bitten three times in one session: a
@@ -272,6 +273,9 @@ check("ane_ffn.share", full.aneFfn?.share, 0.41)
 check("ane_ffn.minimum_rows", full.aneFfn?.minimumRows, 640)
 check("ane_ffn.split_commands", full.aneFfn?.splitCommands, 3)
 check("ane_ffn.ane_ms", full.aneFfn?.aneMs, 1234.5)
+check("streamed_experts.arena_bytes", full.streamedExperts?.arenaBytes, 28140158976)
+check("streamed_experts.slots", full.streamedExperts?.slots, 20356)
+check("streamed_experts.experts", full.streamedExperts?.experts, 24576)
 
 // Schema 6 renamed four keys. The all-keys payload above carries BOTH
 // spellings, so these four assertions pin the coalescing order: the schema 6
@@ -871,7 +875,13 @@ check("languageOnly survives a save/load round-trip",
     // behaviour just because the app was rebuilt.
     let d = SplashProcess.buildLaunchArgs(SplashConfig())
     check("defaults omit --kv-format", d.contains("--kv-format"), false)
-    check("defaults omit --max-cache-disk", d.contains("--max-cache-disk"), false)
+    // A saved auto tier is an absent key; it must stay auto on decode, while a
+    // fresh install takes the recommended preset's tier.
+    let saved = try! JSONDecoder().decode(SplashConfig.self, from: Data("{}".utf8))
+    check("saved config omits --max-cache-disk",
+          SplashProcess.buildLaunchArgs(saved).contains("--max-cache-disk"), false)
+    check("fresh install passes the preset's disk tier", d.contains("--max-cache-disk"),
+          HardwarePreset.recommended(physicalGiB: HostMemory.physicalGiB).maxCacheDisk != nil)
     check("defaults keep the 128K context cap", d.contains("--max-context"), true)
     check("defaults omit --language-only", d.contains("--language-only"), false)
     var visionless = SplashConfig()
