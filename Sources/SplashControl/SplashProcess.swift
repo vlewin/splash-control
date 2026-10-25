@@ -182,6 +182,7 @@ final class SplashProcess: ObservableObject {
   nonisolated static let gatedFlags = [
     "--persistent-cache", "--idle-release", "--served-model-name", "--announce-served-name",
     "--default-reasoning-effort", "--disable-ane", "--state-format",
+    "--expert-memory", "--ple-memory", "--sparse-kv-memory", "--verify-rows",
   ]
 
   /// Fills `serveFlags` from the binary about to be exec'd. Runs once per spawn
@@ -207,6 +208,10 @@ final class SplashProcess: ObservableObject {
     if let e = config.reasoningEffort, !e.isEmpty { want.append("--default-reasoning-effort") }
     if config.disableAne { want.append("--disable-ane") }
     if let sf = config.stateFormat, !sf.isEmpty { want.append("--state-format") }
+    if let v = config.expertMemory, !v.isEmpty { want.append("--expert-memory") }
+    if let v = config.pleMemory, !v.isEmpty { want.append("--ple-memory") }
+    if let v = config.sparseKvMemory, !v.isEmpty { want.append("--sparse-kv-memory") }
+    if let v = config.verifyRows, !v.isEmpty { want.append("--verify-rows") }
     return want.filter { serveFlags.contains($0) }
   }
 
@@ -345,6 +350,30 @@ final class SplashProcess: ObservableObject {
     {
       args += ["--default-reasoning-effort", e]
     }
+    // Streaming stores and draft verification (splash 1.4.0+). Same gate as
+    // the flags above: an older binary rejects them outright under strict
+    // parse_args, and a malformed size is an exit 2 rather than a warning.
+    if let v = Self.sanitizedStoreSize(cfg.expertMemory, allowOff: true),
+      supports.contains("--expert-memory")
+    {
+      args += ["--expert-memory", v]
+    }
+    if let v = Self.sanitizedStoreSize(cfg.pleMemory, allowOff: true),
+      supports.contains("--ple-memory")
+    {
+      args += ["--ple-memory", v]
+    }
+    if let v = Self.sanitizedStoreSize(cfg.sparseKvMemory, allowOff: false),
+      supports.contains("--sparse-kv-memory")
+    {
+      args += ["--sparse-kv-memory", v]
+    }
+    if let rows = cfg.verifyRows?.trimmingCharacters(in: .whitespaces).lowercased(),
+      SplashConfig.verifyRowsValues.contains(rows),
+      supports.contains("--verify-rows")
+    {
+      args += ["--verify-rows", rows]
+    }
     if let extra = cfg.extraArgs, !extra.isEmpty {
       args += extra.split(whereSeparator: { $0 == " " || $0 == "\t" }).map(String.init)
     }
@@ -371,6 +400,41 @@ final class SplashProcess: ObservableObject {
     }
     if let n = Double(raw), n > 0 { return raw }
     return nil
+  }
+
+  /// The grammar `--expert-memory`, `--ple-memory` and `--sparse-kv-memory`
+  /// take: auto, off (where the flag allows it), or a byte count with an
+  /// optional K/M/G unit, with or without the B, and a fraction before the
+  /// unit. Returns the value to pass, or nil when the server would refuse it
+  /// — which under strict parse_args is a crash-loop, not a warning.
+  nonisolated static func sanitizedStoreSize(_ value: String?, allowOff: Bool) -> String? {
+    guard let value else { return nil }
+    let raw = value.trimmingCharacters(in: .whitespaces)
+    guard !raw.isEmpty, !raw.contains(where: { $0.isWhitespace }) else { return nil }
+    let lower = raw.lowercased()
+    if lower == "auto" { return nil }
+    if lower == "off" { return allowOff ? "off" : nil }
+    var number = lower
+    let units: [(String, Int)] = [
+      ("gib", 1 << 30), ("gb", 1 << 30), ("mib", 1 << 20), ("mb", 1 << 20),
+      ("kib", 1 << 10), ("kb", 1 << 10), ("g", 1 << 30), ("m", 1 << 20), ("k", 1 << 10),
+    ]
+    for (unit, _) in units where lower.hasSuffix(unit) {
+      number = String(lower.dropLast(unit.count))
+      break
+    }
+    guard !number.isEmpty, number.first!.isNumber else { return nil }
+    var dots = 0
+    for ch in number {
+      if ch == "." {
+        dots += 1
+        if dots > 1 { return nil }
+      } else if !ch.isNumber {
+        return nil
+      }
+    }
+    guard Double(number) ?? 0 > 0 else { return nil }
+    return raw
   }
 
   /// The same grammar as `sanitizedIdleRelease`, resolved to seconds, so a

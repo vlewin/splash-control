@@ -29,7 +29,7 @@ struct InfoView: View {
   /// 8 is its native wire protocol, which this app never speaks). Keep in sync
   /// with ARCHITECTURE.md § 4.1; the agent that re-verifies against a new
   /// splash release updates both in the same PR.
-  static let supportedSplash = "1.2.0 – 1.3.2"
+  static let supportedSplash = "1.2.0 – 1.4.0"
 
   var body: some View {
     ScrollView {
