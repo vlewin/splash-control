@@ -118,3 +118,39 @@ func status140FixtureDecodes() throws {
   #expect(s.streamedExperts?.slots != nil)
   #expect(s.streamedExperts?.experts != nil)
 }
+
+@Test("1.4.1 windowed layout decodes kv.window")
+func status141WindowDecodes() throws {
+  let json = """
+    {
+      "ready": true,
+      "kv": {
+        "block_tokens": 32,
+        "pages_allocated": 512,
+        "allocated_bytes": 170393600,
+        "window": {
+          "window_pages": 128,
+          "trim": true,
+          "full_pages": 128,
+          "slim_pages": 384,
+          "slim_bytes": 1073741824,
+          "pinned_blocks": 4,
+          "trimmed_pages": 512,
+          "upgrades": 2,
+          "refused_states": 0
+        }
+      }
+    }
+    """
+  let s = try JSONDecoder().decode(StatusDTO.self, from: Data(json.utf8))
+  #expect(s.ready == true)
+  #expect(s.kv?.window?.windowPages == 128)
+  #expect(s.kv?.window?.trim == true)
+  #expect(s.kv?.window?.fullPages == 128)
+  #expect(s.kv?.window?.slimPages == 384)
+  #expect(s.kv?.window?.slimBytes == 1073741824)
+  #expect(s.kv?.window?.pinnedBlocks == 4)
+  #expect(s.kv?.window?.trimmedPages == 512)
+  #expect(s.kv?.window?.upgrades == 2)
+  #expect(s.kv?.window?.refusedStates == 0)
+}

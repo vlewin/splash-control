@@ -1601,10 +1601,22 @@ struct DashboardView: View {
               Double(b) / Double(l) * 100,
               fmtGiB(st.memoryGovernor?.headroomBytes))
           } ?? "--max-memory")
-        Tile(
-          title: "KV reclaimable",
-          value: s?.kv?.reclaimableBytes.map { fmtGiB($0) + " GiB" } ?? "—",
-          caption: "KV memory the engine could hand back")
+        if let win = s?.kv?.window {
+          Tile(
+            title: "KV window",
+            value: win.slimBytes.map { fmtGiB($0) + " GiB slim" } ?? "—",
+            caption: {
+              let slim = win.slimPages ?? 0
+              let full = win.fullPages ?? 0
+              let trimmed = win.trimmedPages ?? 0
+              return "\(trimmed) trimmed · \(slim) slim / \(full) full pages"
+            }())
+        } else {
+          Tile(
+            title: "KV reclaimable",
+            value: s?.kv?.reclaimableBytes.map { fmtGiB($0) + " GiB" } ?? "—",
+            caption: "KV memory the engine could hand back")
+        }
       }
       tileGroup("Host system memory") {
         Tile(

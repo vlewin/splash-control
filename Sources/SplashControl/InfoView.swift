@@ -24,12 +24,12 @@ struct InfoView: View {
   @ObservedObject var updates = UpdateManager.shared
 
   /// Tested-against splash range ("supported" = releases this app renders
-  /// fully). Floor 1.2.0 = status schema 6, the DTO's model; max 1.3.2 = the
+  /// fully). Floor 1.2.0 = status schema 6, the DTO's model; max 1.4.1 = the
   /// supported release range (its `/status` is still schema 6;
-  /// 8 is its native wire protocol, which this app never speaks). Keep in sync
+  /// 11 is its native wire protocol, which this app never speaks). Keep in sync
   /// with ARCHITECTURE.md § 4.1; the agent that re-verifies against a new
   /// splash release updates both in the same PR.
-  static let supportedSplash = "1.2.0 – 1.4.0"
+  static let supportedSplash = "1.2.0 – 1.4.1"
 
   var body: some View {
     ScrollView {
