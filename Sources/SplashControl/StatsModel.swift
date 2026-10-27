@@ -101,6 +101,17 @@ struct Marker: Identifiable, Codable, Equatable {
     self.automatic = automatic
     self.severity = severity
   }
+
+  /// For compaction markers (e.g. "Compact: 2.1s (-195K)"), extracts the duration ("2.1s" or "420ms").
+  var compactDuration: String? {
+    guard label.starts(with: "Compact:") else { return nil }
+    let rest = label.dropFirst("Compact:".count).trimmingCharacters(in: .whitespaces)
+    if let paren = rest.firstIndex(of: "(") {
+      let candidate = String(rest[..<paren]).trimmingCharacters(in: .whitespaces)
+      return (candidate.hasSuffix("s") || candidate.hasSuffix("ms")) ? candidate : nil
+    }
+    return nil
+  }
 }
 
 /// Engine state read off `GET /status`.

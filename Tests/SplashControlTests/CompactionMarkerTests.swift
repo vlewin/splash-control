@@ -129,3 +129,21 @@ func activePrefillProgressClamps() {
   #expect(pOver.percentText == "100%")
 }
 
+@Test("Marker.compactDuration extracts duration from label")
+func markerCompactDurationExtracts() {
+  let m1 = Marker(date: Date(), label: "Compact: 420ms (-27K)", automatic: true)
+  #expect(m1.compactDuration == "420ms")
+
+  let m2 = Marker(date: Date(), label: "Compact: 1.4s (-34K)", automatic: true)
+  #expect(m2.compactDuration == "1.4s")
+
+  let m3 = Marker(date: Date(), label: "Compact: -34K", automatic: true)
+  #expect(m3.compactDuration == nil)
+
+  let m4 = Marker(date: Date(), label: "Thermal: Serious", automatic: true)
+  #expect(m4.compactDuration == nil)
+
+  let m5 = Marker(date: Date(), label: "Power: Low Power", automatic: true)
+  #expect(m5.compactDuration == nil)
+}
+
