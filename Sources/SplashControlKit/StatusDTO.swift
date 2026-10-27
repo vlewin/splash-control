@@ -1,6 +1,6 @@
 import Foundation
 
-/// Codable mirror of `GET /status` as served by splash 1.2.0–1.4.0 (`schema_version 6`).
+/// Codable mirror of `GET /status` as served by splash 1.2.0–1.4.1 (`schema_version 6`).
 /// Optional everywhere the server may omit a key; consumers must tolerate nils.
 /// Keys this DTO does not model yet (`latency`, `frontend`, `response_store`,
 /// `image_cache`, `grammar_cache`, `model_timing`, `draft_context`, `warmup`,
@@ -461,6 +461,33 @@ public struct StatusDTO: Codable, Equatable {
     /// `reclaimable_backing_bytes`; zero means the KV cache is clean, which
     /// is how BUG-11 proved the problem lived in `state`, not KV.
     public var reclaimableBytes: UInt64?
+    /// splash 1.4.1+: Sliding-window KV telemetry for windowed layouts (e.g. Flint).
+    public var window: Window?
+
+    public struct Window: Codable, Equatable {
+      public var windowPages: Int?
+      public var trim: Bool?
+      public var fullPages: Int?
+      public var slimPages: Int?
+      public var slimBytes: UInt64?
+      public var pinnedBlocks: Int?
+      public var trimmedPages: Int?
+      public var upgrades: Int?
+      public var refusedStates: Int?
+
+      public enum CodingKeys: String, CodingKey {
+        case windowPages = "window_pages"
+        case trim
+        case fullPages = "full_pages"
+        case slimPages = "slim_pages"
+        case slimBytes = "slim_bytes"
+        case pinnedBlocks = "pinned_blocks"
+        case trimmedPages = "trimmed_pages"
+        case upgrades
+        case refusedStates = "refused_states"
+      }
+    }
+
     public enum CodingKeys: String, CodingKey {
       case blockTokens = "block_tokens"
       case pagesActive = "pages_active"
@@ -471,6 +498,7 @@ public struct StatusDTO: Codable, Equatable {
       case pagesAllocated = "pages_allocated"
       case legacyPagesResident = "pages_resident"
       case reclaimableBytes = "reclaimable_bytes"
+      case window
     }
     /// Backing memory the engine holds for KV, in either schema.
     public var residentBackingBytes: UInt64? { allocatedBytes ?? legacyResidentBackingBytes }

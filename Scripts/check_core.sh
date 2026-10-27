@@ -203,7 +203,8 @@ let full = dto("""
    "status_age_ms":2500.0,"last_crash_trace":null},
 "kv":{"block_tokens":45,"pages_allocated":47,"pages_active":48,"pages_cache":49,
     "pages_free":50,"allocated_bytes":55,"reclaimable_bytes":56,
-    "resident_backing_bytes":57,"pages_resident":58},
+    "resident_backing_bytes":57,"pages_resident":58,
+    "window":{"window_pages":12,"trim":true,"full_pages":14,"slim_pages":28,"slim_bytes":4294967296,"pinned_blocks":2,"trimmed_pages":8,"upgrades":1,"refused_states":0}},
   "state":{"entries":56,"bytes":57,"allocated_bytes":59,"resident_bytes":60,"evictions":61},
   "cache":{"hits":63,"hit_rate":0.5,"reused_tokens":64},
   "disk":{"capacity_bytes":34359738368,"used_bytes":65,"read_bytes":66,"written_bytes":67,
@@ -272,6 +273,11 @@ check("transport.status_age_ms", full.transport?.statusAgeMs, 2500.0)
 check("transport.restarts", full.transport?.restarts, 44)
 check("kv.block_tokens", full.kv?.blockTokens, 45)
 check("kv.reclaimable_bytes", full.kv?.reclaimableBytes, 56)
+check("kv.window.window_pages", full.kv?.window?.windowPages, 12)
+check("kv.window.trim", full.kv?.window?.trim, true)
+check("kv.window.full_pages", full.kv?.window?.fullPages, 14)
+check("kv.window.slim_pages", full.kv?.window?.slimPages, 28)
+check("kv.window.slim_bytes", full.kv?.window?.slimBytes, 4294967296)
 check("cache.hit_rate", full.cache?.hitRate, 0.5)
 check("identity.cache.dtype", full.identity?.cache?.dtype, "q8s8")
 check("ane_ffn.state", full.aneFfn?.state, "split")
@@ -317,7 +323,8 @@ if let raw = try? String(contentsOfFile: "Tests/Fixtures/status_schema6.json", e
     // Legacy spellings are legal precisely because a schema 5 server sends them.
     // Anything not on this list is a key the server has never sent.
     let legacyOnly: Set<String> = ["resident_backing_bytes", "pages_resident",
-                                  "resident_bytes", "dense_bytes", "observed_resident_bytes"]
+                                  "resident_bytes", "dense_bytes", "observed_resident_bytes",
+                                  "window"]
 
     func serverKeys(_ section: String) -> Set<String> {
         Set(((captured[section] as? [String: Any]) ?? [:]).keys)
