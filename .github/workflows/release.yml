@@ -116,6 +116,9 @@ jobs:
           # Tap the real remote repository explicitly using its URL (vlewin/tap,
           # not vlewin/homebrew-tap) and work inside its clone.
           brew tap vlewin/tap https://github.com/vlewin/tap
+          # Homebrew refuses to load casks from taps nobody has trusted; a runner
+          # has no interactive trust, so trust this tap before auditing.
+          brew trust --tap vlewin/tap
           TAPDIR="$(brew --repo vlewin/tap)"
           mkdir -p "$TAPDIR/Casks"
           cp "dist/SplashControl-${{ steps.tag_version.outputs.new_tag }}.cask" "$TAPDIR/Casks/splash-control.rb"
