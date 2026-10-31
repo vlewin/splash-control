@@ -1,13 +1,14 @@
 import Foundation
 
-/// Codable mirror of `GET /status` as served by splash 1.2.0–1.4.1 (`schema_version 6`).
+/// Codable mirror of `GET /status` as served by splash 1.2.0–1.5.0 (`schema_version 6`).
 /// Optional everywhere the server may omit a key; consumers must tolerate nils.
 /// Keys this DTO does not model yet (`latency`, `frontend`, `response_store`,
-/// `image_cache`, `grammar_cache`, `model_timing`, `draft_context`, `warmup`,
-/// `http`, `images`, `memory_audit`, `constraint_masks`, `loop`, and 1.4.0's
-/// `verify_rows`, `streamed_table`, `kv_spill`) are ignored by
-/// Codable. `recent_requests` is absent from every release to date — keep it
-/// optional.
+/// `image_cache`, `grammar_cache`, `tokenizer_cache`, `http`, `images`,
+/// `constraint_masks`, `loop`, `vision`, `input_modalities`, `chat_template`,
+/// `schema_version`, and the detail nested inside `streamed_table` and
+/// `kv_spill`) are ignored by Codable — `frontend` deliberately, per
+/// ARCHITECTURE.md § 4.3, and `schema_version` because nothing here branches on
+/// it. `recent_requests` is absent from every release to date — keep it optional.
 ///
 /// **Schema 6 renamed four keys and deleted seven.** The tray can run against an
 /// adopted server of either version (it resolves a binary but adopts whatever is
@@ -51,6 +52,27 @@ public struct StatusDTO: Codable, Equatable {
   /// splash 1.4.0+: the routed-expert store of a MoE target. Absent for a
   /// dense model and on older releases.
   public var streamedExperts: StreamedExperts?
+  /// splash 1.4.0+: rows of a draft block the decode cycles verify — the mode
+  /// `--verify-rows` *resolved to* ("auto" | "all"), not what the user typed.
+  public var verifyRows: String?
+  /// splash 1.4.0+: the streamed PLE table. The server sends `null` when no
+  /// table streams, which decodes to nil here.
+  public var streamedTable: StreamedTable?
+  /// splash 1.4.0+: KV spilled to the SSD tier. Absent for a target whose KV
+  /// stays resident (`memory_plan.budget.kv_spill` is null).
+  public var kvSpill: KVSpill?
+  /// splash 1.3.2+: the engine's own breakdown of what its allocations are.
+  public var memoryAudit: MemoryAudit?
+  /// splash 1.3.2+: GPU vs wall time of the last and all prefill/decode commands.
+  public var modelTiming: ModelTiming?
+  /// splash 1.3.2+: which warmup steps actually ran.
+  public var warmup: Warmup?
+  /// splash 1.3.2+: draft-context row bookkeeping — rows materialised versus
+  /// rows the engine avoided by reusing a cached context.
+  public var draftContext: DraftContext?
+  /// splash 1.5.0+: whether a request's reasoning effort toggles the model's
+  /// thinking at all (`false` for Flint, whose model decides each turn).
+  public var reasoningSwitch: Bool?
 
   public enum CodingKeys: String, CodingKey {
     case ready
@@ -66,6 +88,14 @@ public struct StatusDTO: Codable, Equatable {
     case aneFfn = "ane_ffn"
     case activeRequests = "active_requests"
     case streamedExperts = "streamed_experts"
+    case verifyRows = "verify_rows"
+    case streamedTable = "streamed_table"
+    case kvSpill = "kv_spill"
+    case memoryAudit = "memory_audit"
+    case modelTiming = "model_timing"
+    case warmup
+    case draftContext = "draft_context"
+    case reasoningSwitch = "reasoning_switch"
   }
 
   /// splash 1.3.2+: Live request snapshot from `/status.active_requests`.
@@ -154,6 +184,213 @@ public struct StatusDTO: Codable, Equatable {
     public enum CodingKeys: String, CodingKey {
       case slots, experts
       case arenaBytes = "arena_bytes"
+    }
+  }
+
+  /// splash 1.4.0+: the streamed PLE table's cache. `cachedRows / cacheCapacityRows`
+  /// is how full it is; `readErrors` and `poisoned` are the failure signals, and
+  /// `failure` is empty while the table is healthy.
+  public struct StreamedTable: Codable, Equatable {
+    public var table: String?
+    public var tableBytes: UInt64?
+    public var cacheBytes: UInt64?
+    public var cacheCapacityRows: UInt64?
+    public var cachedRows: UInt64?
+    public var evictions: UInt64?
+    public var readBytes: UInt64?
+    public var readRetries: UInt64?
+    public var readErrors: UInt64?
+    public var poisoned: Bool?
+    public var failure: String?
+    public var prefill: StageCounters?
+    public var decode: StageCounters?
+    public enum CodingKeys: String, CodingKey {
+      case table, evictions, poisoned, failure, prefill, decode
+      case tableBytes = "table_bytes"
+      case cacheBytes = "cache_bytes"
+      case cacheCapacityRows = "cache_capacity_rows"
+      case cachedRows = "cached_rows"
+      case readBytes = "read_bytes"
+      case readRetries = "read_retries"
+      case readErrors = "read_errors"
+    }
+  }
+
+  /// splash 1.4.0+: per-phase stage counters of the streamed table. `hitRate` is
+  /// `hit_rows / requested_rows`, so it is a ratio the server already computes —
+  /// do not recompute it from the row counts.
+  public struct StageCounters: Codable, Equatable {
+    public var stages: UInt64?
+    public var requestedRows: UInt64?
+    public var uniqueRows: UInt64?
+    public var hitRows: UInt64?
+    public var readRows: UInt64?
+    public var hitRate: Double?
+    public enum CodingKeys: String, CodingKey {
+      case stages
+      case requestedRows = "requested_rows"
+      case uniqueRows = "unique_rows"
+      case hitRows = "hit_rows"
+      case readRows = "read_rows"
+      case hitRate = "hit_rate"
+    }
+  }
+
+  /// splash 1.4.0+: KV on the SSD tier. Only the counters that say whether
+  /// spilling is *happening* are mirrored; the block cache and history-stream
+  /// detail inside `kv_spill` is engine-internal.
+  public struct KVSpill: Codable, Equatable {
+    public var spillMoves: UInt64?
+    public var unspills: UInt64?
+    public var rewrites: UInt64?
+    public var indexRunwayBytes: UInt64?
+    public var quota: SpillQuota?
+    public var requests: SpillRequests?
+    public enum CodingKeys: String, CodingKey {
+      case quota, requests
+      case spillMoves = "spill_moves"
+      case unspills
+      case rewrites
+      case indexRunwayBytes = "index_runway_bytes"
+    }
+  }
+
+  public struct SpillQuota: Codable, Equatable {
+    public var activeLimitBytes: UInt64?
+    public var heldBytes: UInt64?
+    public var committedBytes: UInt64?
+    public var revoked: UInt64?
+    public enum CodingKeys: String, CodingKey {
+      case revoked
+      case activeLimitBytes = "active_limit_bytes"
+      case heldBytes = "held_bytes"
+      case committedBytes = "committed_bytes"
+    }
+  }
+
+  /// Requests counted by how they started. `refused` says *why* a start could
+  /// not spill: quota exhausted, write budget, or the tier closed.
+  public struct SpillRequests: Codable, Equatable {
+    public var spill: UInt64?
+    public var resident: UInt64?
+    public var converted: UInt64?
+    public var bounded: UInt64?
+    public var lengthEnds: UInt64?
+    public var waitingQuota: UInt64?
+    public var refused: RefusedStarts?
+    public enum CodingKeys: String, CodingKey {
+      case spill, resident, converted, bounded, refused
+      case lengthEnds = "length_ends"
+      case waitingQuota = "waiting_quota"
+    }
+  }
+
+  public struct RefusedStarts: Codable, Equatable {
+    public var quota: UInt64?
+    public var writeBudget: UInt64?
+    public var closed: UInt64?
+    public enum CodingKeys: String, CodingKey {
+      case quota, closed
+      case writeBudget = "write_budget"
+    }
+  }
+
+  /// splash 1.3.2+: the engine's audit of its own memory. `valid` is false when
+  /// the audit could not be taken, in which case `error` names the reason and
+  /// the byte figures are not meaningful.
+  public struct MemoryAudit: Codable, Equatable {
+    public var scope: String?
+    public var valid: Bool?
+    public var error: String?
+    public var categorizedBytes: UInt64?
+    public var backendUnclassifiedBytes: UInt64?
+    public var deviceUntrackedBytes: UInt64?
+    public var devicePeakDeviationBasisPoints: UInt64?
+    public var actualHeadroomBytes: UInt64?
+    public var backendAllocatedBytes: UInt64?
+    public var deviceCurrentAllocatedBytes: UInt64?
+    public var devicePeakAllocatedBytes: UInt64?
+    public var backendPeakAllocatedBytes: UInt64?
+    public enum CodingKeys: String, CodingKey {
+      case scope, valid, error
+      case categorizedBytes = "categorized_bytes"
+      case backendUnclassifiedBytes = "backend_unclassified_bytes"
+      case deviceUntrackedBytes = "device_untracked_bytes"
+      case devicePeakDeviationBasisPoints = "device_peak_deviation_basis_points"
+      case actualHeadroomBytes = "actual_headroom_bytes"
+      case backendAllocatedBytes = "backend_allocated_bytes"
+      case deviceCurrentAllocatedBytes = "device_current_allocated_bytes"
+      case devicePeakAllocatedBytes = "device_peak_allocated_bytes"
+      case backendPeakAllocatedBytes = "backend_peak_allocated_bytes"
+    }
+  }
+
+  /// splash 1.3.2+: GPU time spans Metal command buffers, wall time the whole
+  /// command, so the gap between them is host work — the figure the ANE split
+  /// shows up in.
+  public struct ModelTiming: Codable, Equatable {
+    public var scope: String?
+    public var prefill: PhaseTiming?
+    public var decode: PhaseTiming?
+    public enum CodingKeys: String, CodingKey {
+      case scope, prefill, decode
+    }
+  }
+
+  public struct PhaseTiming: Codable, Equatable {
+    public var lastGpuMs: Double?
+    public var lastWallMs: Double?
+    public var totalGpuMs: Double?
+    public var totalWallMs: Double?
+    public enum CodingKeys: String, CodingKey {
+      case lastGpuMs = "last_gpu_ms"
+      case lastWallMs = "last_wall_ms"
+      case totalGpuMs = "total_gpu_ms"
+      case totalWallMs = "total_wall_ms"
+    }
+  }
+
+  /// splash 1.3.2+: which warmup steps ran. A step missing from the list below
+  /// means it was skipped, usually because the memory budget would not fit it
+  /// (`memoryLimitedSteps` names those).
+  public struct Warmup: Codable, Equatable {
+    public var prefill2048: Bool?
+    public var decodeB1: Bool?
+    public var decodeB2: Bool?
+    public var decodeB3: Bool?
+    public var decodeB4: Bool?
+    public var compositeStateRestore: Bool?
+    public var memoryLimitedSteps: [String]?
+    public var detail: String?
+    public enum CodingKeys: String, CodingKey {
+      case prefill2048 = "prefill_2048"
+      case decodeB1 = "decode_b1"
+      case decodeB2 = "decode_b2"
+      case decodeB3 = "decode_b3"
+      case decodeB4 = "decode_b4"
+      case compositeStateRestore = "composite_state_restore"
+      case memoryLimitedSteps = "memory_limited_steps"
+      case detail
+    }
+  }
+
+  /// splash 1.3.2+: draft-context rows. `avoidedRows` over
+  /// `targetPrefillRows` is the share of prefill the engine skipped by reusing
+  /// a cached context.
+  public struct DraftContext: Codable, Equatable {
+    public var targetPrefillRows: UInt64?
+    public var promptEndRows: UInt64?
+    public var materializationRows: UInt64?
+    public var avoidedRows: UInt64?
+    public var restoreSkipped: UInt64?
+    public var resets: UInt64?
+    public enum CodingKeys: String, CodingKey {
+      case resets
+      case targetPrefillRows = "target_prefill_rows"
+      case promptEndRows = "prompt_end_rows"
+      case materializationRows = "materialization_rows"
+      case avoidedRows = "avoided_rows"
+      case restoreSkipped = "restore_skipped"
     }
   }
 

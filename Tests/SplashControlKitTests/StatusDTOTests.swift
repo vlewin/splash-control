@@ -117,6 +117,28 @@ func status140FixtureDecodes() throws {
   #expect(s.streamedExperts?.arenaBytes != nil)
   #expect(s.streamedExperts?.slots != nil)
   #expect(s.streamedExperts?.experts != nil)
+  // The 1.5.0 key must read nil on a server that predates it.
+  #expect(s.reasoningSwitch == nil)
+}
+
+@Test("1.5.0 fixture decodes the newly mirrored sections")
+func status150FixtureDecodes() throws {
+  let s = try JSONDecoder().decode(StatusDTO.self, from: try fixture("status_schema6_1_5_0.json"))
+  #expect(s.ready == true)
+  #expect(s.verifyRows != nil)
+  #expect(s.reasoningSwitch != nil)
+  #expect(s.memoryAudit?.valid != nil)
+  #expect(s.memoryAudit?.categorizedBytes != nil)
+  #expect(s.modelTiming?.prefill?.totalGpuMs != nil)
+  #expect(s.modelTiming?.decode?.lastWallMs != nil)
+  #expect(s.warmup?.decodeB1 != nil)
+  #expect(s.warmup?.compositeStateRestore != nil)
+  #expect(s.warmup?.memoryLimitedSteps != nil)
+  #expect(s.draftContext?.avoidedRows != nil)
+  #expect(s.streamedTable?.cacheCapacityRows != nil)
+  #expect(s.streamedTable?.prefill?.hitRate != nil)
+  #expect(s.kvSpill?.quota?.activeLimitBytes != nil)
+  #expect(s.kvSpill?.requests?.refused != nil)
 }
 
 @Test("1.4.1 windowed layout decodes kv.window")
