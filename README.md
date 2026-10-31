@@ -110,6 +110,7 @@ Once the `vlewin/tap` repository exists (see `Scripts/render-cask.sh` — it is
 rendered and published by the release pipeline on every tagged release):
 
 ```bash
+brew trust vlewin/tap                      # Homebrew needs the tap trusted first
 brew install --cask vlewin/tap/splash-control
 ```
 
