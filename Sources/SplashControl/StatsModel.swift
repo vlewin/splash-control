@@ -101,6 +101,17 @@ struct Marker: Identifiable, Codable, Equatable {
     self.automatic = automatic
     self.severity = severity
   }
+
+  /// For compaction markers (e.g. "Compact: 2.1s (-195K)"), extracts the duration ("2.1s" or "420ms").
+  var compactDuration: String? {
+    guard label.starts(with: "Compact:") else { return nil }
+    let rest = label.dropFirst("Compact:".count).trimmingCharacters(in: .whitespaces)
+    if let paren = rest.firstIndex(of: "(") {
+      let candidate = String(rest[..<paren]).trimmingCharacters(in: .whitespaces)
+      return (candidate.hasSuffix("s") || candidate.hasSuffix("ms")) ? candidate : nil
+    }
+    return nil
+  }
 }
 
 /// Engine state read off `GET /status`.
@@ -532,26 +543,19 @@ final class StatsModel: ObservableObject {
     if let ct = status.requests?.completed, let cpt = prev?.requests?.completed, ct > cpt {
       let completedTurnPeak = max(currentTurnPeakPages, prev?.kv?.pagesActive ?? 0)
       if completedTurnPeak > 0 {
-        let prefillDelta: Double? = {
-          if let pw = m?.prefillWallMs, let qpw = prev?.metrics?.prefillWallMs, pw > qpw {
-            return Double(pw - qpw)
-          }
-          return nil
-        }()
-        let elapsed: Double? = lastSampleDate.map { now.timeIntervalSince($0) }
+        let maxCtx = status.maximumContextTokens ?? status.memoryPlan?.maximumContextTokens
         if let compactLabel = Self.evaluateCompactionDrop(
           previousPages: lastTurnPeakPages,
           previousBlockTokens: prev?.kv?.blockTokens ?? status.kv?.blockTokens,
           currentPages: completedTurnPeak,
           currentBlockTokens: status.kv?.blockTokens,
+          maxContextTokens: maxCtx,
           previousRequestsCompleted: cpt,
           currentRequestsCompleted: ct,
           previousRestarts: prev?.transport?.restarts,
           currentRestarts: status.transport?.restarts,
           weightsReleased: status.weights?.released,
-          statusStale: status.transport?.statusStale,
-          prefillDeltaMs: prefillDelta,
-          elapsedSec: elapsed
+          statusStale: status.transport?.statusStale
         ) {
           let lastCompact = markers.last { $0.label.starts(with: "Compact") }
           if lastCompact == nil || now.timeIntervalSince(lastCompact!.date) >= 10 {
@@ -970,10 +974,10 @@ final class StatsModel: ObservableObject {
   nonisolated static func evaluateCompactionDrop(
     previousPages: Int?, previousBlockTokens: Int?,
     currentPages: Int?, currentBlockTokens: Int?,
+    maxContextTokens: Int?,
     previousRequestsCompleted: UInt64?, currentRequestsCompleted: UInt64?,
     previousRestarts: Int?, currentRestarts: Int?,
-    weightsReleased: Bool?, statusStale: Bool?,
-    prefillDeltaMs: Double?, elapsedSec: Double?
+    weightsReleased: Bool?, statusStale: Bool?
   ) -> String? {
     guard let pPages = previousPages, let cPages = currentPages,
       pPages > 0, cPages > 0
@@ -986,8 +990,26 @@ final class StatsModel: ObservableObject {
     let drop = pTokens - cTokens
     let dropRatio = Double(drop) / Double(pTokens)
 
-    // Cliff drop threshold: at least 35% reduction and at least 8,192 tokens dropped
-    guard dropRatio >= 0.35 && drop >= 8_192 else { return nil }
+    // Context ceiling gate: session must have approached context capacity (>= 70% of cap,
+    // or >= 64K if cap unknown).
+    let cap = maxContextTokens ?? 0
+    if cap > 0 {
+      guard pTokens >= Int(Double(cap) * 0.70) else { return nil }
+    } else {
+      guard pTokens >= 65_536 else { return nil }
+    }
+
+    // Cliff drop threshold: at least 70% reduction.
+    let minDrop = cap > 0 ? min(32_768, Int(Double(cap) * 0.50)) : 32_768
+    guard dropRatio >= 0.70 && drop >= minDrop else { return nil }
+
+    // Low post-compaction floor: retained context after compaction must be back at baseline
+    // summary size (<= 25% of cap, or <= 32K if cap unknown).
+    if cap > 0 {
+      guard cTokens <= Int(Double(cap) * 0.25) else { return nil }
+    } else {
+      guard cTokens <= 32_768 else { return nil }
+    }
 
     // Confirming signals: requests.completed advanced (work happened)
     guard let cReq = currentRequestsCompleted, let pReq = previousRequestsCompleted, cReq > pReq
@@ -999,13 +1021,7 @@ final class StatsModel: ObservableObject {
     guard statusStale != true else { return nil }
 
     let dropK = Double(drop) / 1000.0
-    if let ms = prefillDeltaMs, ms > 0 {
-      return String(format: "Compact: %.0fms (-%.0fK)", ms, dropK)
-    } else if let sec = elapsedSec, sec > 0 && sec < 10.0 {
-      return String(format: "Compact: %.1fs (-%.0fK)", sec, dropK)
-    } else {
-      return String(format: "Compact: -%.0fK", dropK)
-    }
+    return String(format: "Compact: -%.0fK", dropK)
   }
 
   // MARK: - Chart bucketing

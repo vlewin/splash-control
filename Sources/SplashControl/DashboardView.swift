@@ -117,6 +117,8 @@ private struct SeriesChart: View {
   var window: TimeInterval = 60 * 60
   /// Optional horizontal threshold rules (e.g. context ceiling)
   var thresholdLines: [ThresholdLine] = []
+  /// Optional suffix appended to the primary series value in the scrub header (e.g. "% of cap")
+  var scrubSuffix: ((Double?) -> String)? = nil
   struct ThresholdLine: Equatable {
     let value: Double
     let label: String
@@ -356,8 +358,8 @@ private struct SeriesChart: View {
         HStack(spacing: 3) {
           Circle().fill(color).frame(width: 5, height: 5)
           let formatted =
-            pv.map { unit == "%" ? String(format: "%.0f%%", $0) : String(format: "%.1f", $0) }
-            ?? "—"
+            (pv.map { unit == "%" ? String(format: "%.0f%%", $0) : String(format: "%.1f", $0) }
+              ?? "—") + (scrubSuffix?(pv) ?? "")
           Text("\(primaryName) \(formatted)")
             .font(.system(size: 10, weight: .semibold, design: .monospaced))
         }
@@ -416,7 +418,7 @@ private struct SeriesChart: View {
   private var styledChart: some View {
     let currentPoints = visiblePoints
     let currentBarWidth = barWidth
-    let currentThresholds = thresholdLines
+    let currentThresholds = thresholdLines.filter { $0.value <= yUpper }
     let domain = plotDomain ?? .distantPast ... .distantFuture
     let chart = Chart {
       ForEach(currentThresholds, id: \.label) { threshold in
@@ -499,31 +501,38 @@ private struct SeriesChart: View {
             position: .bottom, alignment: .center, spacing: 23,
             overflowResolution: .init(x: .fit(to: .chart), y: .disabled)
           ) {
-            let icon: String = {
+            let (icon, badgeText): (String, String?) = {
               if marker.label.starts(with: "Thermal") {
-                return "flame.fill"
+                return ("flame.fill", nil)
               } else if marker.label.starts(with: "Power") {
-                return "bolt.fill"
+                return ("bolt.fill", nil)
               } else if marker.label.starts(with: "Compact") {
-                return "scissors"
+                return ("scissors", marker.compactDuration)
               }
-              return "circle.fill"
+              return ("circle.fill", nil)
             }()
-            Image(systemName: icon)
-              .font(.system(size: 7, weight: .semibold))
-              .foregroundStyle(markerColor)
-              .padding(.horizontal, 4)
-              .padding(.vertical, 2)
-              .background(
-                RoundedRectangle(cornerRadius: 3)
-                  .fill(Color(nsColor: .controlBackgroundColor))
-              )
-              .overlay(
-                RoundedRectangle(cornerRadius: 3)
-                  .strokeBorder(markerColor.opacity(0.6), lineWidth: 1)
-              )
-              .shadow(color: Color.black.opacity(0.12), radius: 1, x: 0, y: 1)
-              .help(marker.label)
+            HStack(spacing: 2) {
+              Image(systemName: icon)
+                .font(.system(size: 7, weight: .semibold))
+              if let badgeText {
+                Text(badgeText)
+                  .font(.system(size: 8, weight: .semibold, design: .monospaced))
+                  .lineLimit(1)
+              }
+            }
+            .foregroundStyle(markerColor)
+            .padding(.horizontal, 4)
+            .padding(.vertical, 2)
+            .background(
+              RoundedRectangle(cornerRadius: 3)
+                .fill(Color(nsColor: .controlBackgroundColor))
+            )
+            .overlay(
+              RoundedRectangle(cornerRadius: 3)
+                .strokeBorder(markerColor.opacity(0.6), lineWidth: 1)
+            )
+            .shadow(color: Color.black.opacity(0.12), radius: 1, x: 0, y: 1)
+            .help(marker.label)
           }
       }
       // The scrub rule, drawn last so it sits above the data.
@@ -1095,7 +1104,12 @@ struct DashboardView: View {
           yMinFloor: 32.0,
           desiredTicks: 3,
           window: window,
-          thresholdLines: contextCeilingLines
+          thresholdLines: contextCeilingLines,
+          scrubSuffix: { val in
+            guard let v = val, let cap = stats.contextCap, cap > 0 else { return "" }
+            let pct = (v * 1000.0) / Double(cap) * 100.0
+            return String(format: " (%.0f%%)", pct)
+          }
         )
       }
     }
@@ -1104,15 +1118,16 @@ struct DashboardView: View {
   private var contextCeilingLines: [SeriesChart.ThresholdLine] {
     guard let maxTok = stats.contextCap, maxTok > 0 else { return [] }
     let capK = Double(maxTok) / 1000.0
-    let label = String(format: "cap %.0fK", Double(maxTok) / 1024.0)
+    let capLabel = String(format: "cap %.0fK", Double(maxTok) / 1024.0)
+
     return [
       SeriesChart.ThresholdLine(
         value: capK,
-        label: label,
+        label: capLabel,
         color: Color.secondary.opacity(0.75),
         position: .bottom,
         alignment: .leading,
-        pinsMax: capK <= 140.0
+        pinsMax: capK <= 280.0
       )
     ]
   }
