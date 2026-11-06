@@ -31,7 +31,7 @@ struct InfoView: View {
   /// protocol is a separate version number this app never speaks). Keep in sync
   /// with ARCHITECTURE.md § 4.1; the agent that re-verifies against a new
   /// splash release updates both in the same PR.
-  static let supportedSplash = "1.2.0 – 1.5.0"
+  static let supportedSplash = "1.2.0 – 1.6.0"
 
   var body: some View {
     ScrollView {

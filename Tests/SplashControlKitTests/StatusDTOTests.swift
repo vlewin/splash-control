@@ -141,6 +141,20 @@ func status150FixtureDecodes() throws {
   #expect(s.kvSpill?.requests?.refused != nil)
 }
 
+@Test("1.6.0 fixture decodes schema 8 and the ttft_parts_ms split")
+func status160FixtureDecodes() throws {
+  let s = try JSONDecoder().decode(StatusDTO.self, from: try fixture("status_schema8_1_6_0.json"))
+  #expect(s.ready == true)
+  #expect(s.maximumContextTokens == 262144)
+  #expect(s.memoryPlan?.model?.stateFormat == "fp32")
+  #expect(s.verifyRows == "auto")
+  let parts = try #require(s.metrics?.ttftPartsMs)
+  #expect(parts["own_prefill"]?.samples != nil)
+  #expect(parts["claim_wait"] != nil)
+  #expect(parts["other_prefill"] != nil)
+  #expect(parts["rest"] != nil)
+}
+
 @Test("1.4.1 windowed layout decodes kv.window")
 func status141WindowDecodes() throws {
   let json = """

@@ -1,6 +1,7 @@
 import Foundation
 
-/// Codable mirror of `GET /status` as served by splash 1.2.0–1.5.0 (`schema_version 6`).
+/// Codable mirror of `GET /status` as served by splash 1.2.0–1.6.0
+/// (`schema_version` 6 through 8; 1.6.0 raises it to 8).
 /// Optional everywhere the server may omit a key; consumers must tolerate nils.
 /// Keys this DTO does not model yet (`latency`, `frontend`, `response_store`,
 /// `image_cache`, `grammar_cache`, `tokenizer_cache`, `http`, `images`,
@@ -18,6 +19,14 @@ import Foundation
 /// that can only ever be nil is worse than no field, because it looks like data.
 /// `Scripts/check_core.sh` asserts every key declared here is one the server
 /// actually sends; that check is what caught this batch.
+///
+/// Schema 8 (splash 1.6.0) deletes `kv_spill.history_stream.contended_commands`
+/// and `memory_plan.budget.resident_kv_bytes`, neither of which this DTO read,
+/// and counts a request a stop sequence ended under `requests.completed` rather
+/// than `requests.cancelled`. It adds `metrics.ttft_parts_ms`, modelled below,
+/// and `metrics.decode_gap_causes`, which is deliberately not modelled: its map
+/// is six `{gaps, ms}` objects plus a bare `prefill_ms` number, so a typed field
+/// would need a wrapper nobody consumes.
 public struct StatusDTO: Codable, Equatable {
   public init() {}
   public var ready: Bool?
@@ -578,6 +587,10 @@ public struct StatusDTO: Codable, Equatable {
     public var metalFailures: UInt64?
     public var currentPrefillBatch: Batch?
     public var currentDecodeBatch: Batch?
+    /// splash 1.6.0+: the first-token time split into where it went —
+    /// `own_prefill`, `claim_wait`, `decode`, `other_prefill`, `rest`. Each is a
+    /// window with more digits than `LatencyWindow` keeps, which Codable ignores.
+    public var ttftPartsMs: [String: LatencyWindow]?
     public enum CodingKeys: String, CodingKey {
       case ttftMs = "ttft_ms"
       case itlMs = "itl_ms"
@@ -594,6 +607,7 @@ public struct StatusDTO: Codable, Equatable {
       case metalFailures = "metal_failures"
       case currentPrefillBatch = "current_prefill_batch"
       case currentDecodeBatch = "current_decode_batch"
+      case ttftPartsMs = "ttft_parts_ms"
     }
   }
 

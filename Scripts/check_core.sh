@@ -373,10 +373,12 @@ check("schema 5 governor.observedResidentBytes still decodes", v5.memoryGovernor
 // Union every captured fixture: the 1.2 capture predates the sections added
 // later, and judging a new section against it would flag it as dropped.
 var captured: [String: Any] = [:]
+var highestSchema = 0
 for name in ((try? FileManager.default.contentsOfDirectory(atPath: "Tests/Fixtures")) ?? [])
-  where name.hasPrefix("status_schema6") {
+  where name.hasPrefix("status_schema") {
   guard let data = FileManager.default.contents(atPath: "Tests/Fixtures/\(name)"),
         let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { continue }
+  highestSchema = max(highestSchema, root["schema_version"] as? Int ?? 0)
   for (key, value) in root {
     if captured[key] == nil {
       captured[key] = value
@@ -387,7 +389,7 @@ for name in ((try? FileManager.default.contentsOfDirectory(atPath: "Tests/Fixtur
 }
 
 if !captured.isEmpty {
-    check("fixture is the schema this DTO claims to mirror", captured["schema_version"] as? Int, 6)
+    check("the newest fixture is the schema this DTO claims to mirror", highestSchema, 8)
 
     // Legacy spellings are legal precisely because a schema 5 server sends them.
     // Anything not on this list is a key the server has never sent.
@@ -429,7 +431,7 @@ if !captured.isEmpty {
         // model is the deliberate-subset case the file doc comment describes, so
         // demanding full coverage would force ~35 fields nobody reads.
         let phantom = declaredKeys(section).subtracting(serverKeys(section)).subtracting(legacyOnly)
-        check("schema 6: \(section) declares no key the server dropped", phantom, [])
+        check("captured schemas: \(section) declares no key the server dropped", phantom, [])
     }
 } else {
     check("status fixtures readable", "no Tests/Fixtures/status_schema6*.json parseable", "parseable")
