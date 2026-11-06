@@ -909,8 +909,10 @@ struct SettingsView: View {
             text: Binding(
               get: { config.config.extraArgs ?? "" },
               set: { val in
-                let trimmed = val.trimmingCharacters(in: .whitespaces)
-                config.config.extraArgs = trimmed.isEmpty ? nil : trimmed
+                // Kept verbatim: trimming per keystroke deletes the space the
+                // user just typed, so a second flag can never be entered. The
+                // launcher splits on whitespace, so stray edges are harmless.
+                config.config.extraArgs = val.isEmpty ? nil : val
               }
             )
           )
