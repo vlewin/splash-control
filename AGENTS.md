@@ -197,9 +197,12 @@ learning) and buys nothing a test run does not already prove.
 make screenshot VIEW=settings   # live|metrics|stats|logs|settings|info (default: live)
 ```
 
-Window-targeted; inspect the PNG with your image-viewing tool. **Do not**
-parse pixels, probe the accessibility tree, or blind-click by coordinate
-(full protocol: § 13).
+Window-targeted; inspect the PNG with your image-viewing tool. A capture
+settles **appearance** only (layout, clipping, spacing). **State** — a
+field's text, what reached the config file, whether a key equivalent routes
+to the editor — is proved through System Events against the live bundle.
+Do not parse pixels or blind-click by coordinate; the protocol and its traps
+are in [DESIGN.md](DESIGN.md) § 4.
 
 ### Layout safety rules
 
