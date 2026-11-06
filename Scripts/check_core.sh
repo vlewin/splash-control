@@ -2291,6 +2291,16 @@ do {
     check("a mixed-case query still matches",
           LogsView.highlighted("Done done DONE", needle: "done")
               .runs.filter { $0.backgroundColor != nil }.count, 3)
+
+    // The pane renders those runs through `LogText` as AppKit attributes, so
+    // the run mapping is what can silently drop or reorder characters.
+    let rendered = LogText.attributed(["23:01:06 Done · input 1,008", "second line"], needle: "done")
+    check("the rendered pane text is exactly the lines",
+          rendered.string, "23:01:06 Done · input 1,008\nsecond line\n")
+    check("the rendered match keeps its tint",
+          rendered.attribute(.backgroundColor, at: 9, effectiveRange: nil) != nil, true)
+    check("the rendered non-match carries no tint",
+          rendered.attribute(.backgroundColor, at: 20, effectiveRange: nil) == nil, true)
 }
 
 // MARK: - PowerMode caching (2.1)
@@ -2334,6 +2344,7 @@ swiftc -O -o "$work/check" \
   Sources/SplashControl/ModelCatalog.swift \
   Sources/SplashControl/ModelStats.swift \
   Sources/SplashControl/LogsView.swift \
+  Sources/SplashControl/LogTextView.swift \
   Sources/SplashControl/ContentHeight.swift \
   Sources/SplashControl/ZoomControls.swift \
   Sources/SplashControl/FixedSegmented.swift \

@@ -177,37 +177,10 @@ struct LogsView: View {
   }
 
   private var logBody: some View {
-    ScrollViewReader { proxy in
-      // A Text PER LINE in a LazyVStack, not one Text for the whole
-      // log. One giant Text measured 3.07 s to lay out at 400 lines /
-      // 168 KB — ~18 ms of SwiftUI layout per KB, ~600x raw
-      // CoreText — because every character is laid out even off
-      // screen, and long lines wrap into several visual rows each.
-      // LazyVStack lays out only what is visible, so the cost stops
-      // depending on how much history the log holds. The cost is that
-      // a drag selects one line at a time instead of a block.
-      ScrollView {
-        LazyVStack(alignment: .leading, spacing: 0) {
-          ForEach(Array(visible.enumerated()), id: \.offset) { _, line in
-            Self.row(line, needle: needle)
-              .font(f(size: 11, design: .monospaced))
-              .foregroundStyle(Self.colour(for: line))
-              .textSelection(.enabled)
-              .frame(maxWidth: .infinity, alignment: .leading)
-          }
-          // Bottom marker. It is only on screen when the tail is, so its
-          // disappearance IS the "user scrolled up into history" signal.
-          // The alternative — `defaultScrollAnchor(.bottom)` — re-pinned
-          // on every update, which is exactly the defect being fixed, and
-          // the precise geometry API for "distance from bottom" is macOS
-          // 15, above this app's floor.
-          Color.clear.frame(height: 1)
-            .id(Self.tailAnchor)
-            .onAppear { followTail = true }
-            .onDisappear { followTail = false }
-        }
-        .padding(.vertical, 6)
-      }
+    // `LogTextView` is AppKit: SwiftUI's per-`Text` selection could not span
+    // lines, and a single `Text` for the tail costs seconds to lay out. See
+    // that file for the trade.
+    LogTextView(lines: visible, needle: needle, followTail: $followTail)
       .background(
         RoundedRectangle(cornerRadius: 12)
           .fill(Color.primary.opacity(0.03))
@@ -217,38 +190,11 @@ struct LogsView: View {
           .stroke(Color.primary.opacity(0.06), lineWidth: 0.5)
       )
       // Greedy, so a short or empty log does not hand its ideal height back to
-      // the VStack. `ScrollView` has no intrinsic height, so left alone
+      // the VStack. A scroll view has no intrinsic height, so left alone
       // this box contributes ~0 and the window is free to shrink to
       // header + footer whenever the row count drops.
       .frame(maxWidth: .infinity, maxHeight: .infinity)
-      .task(id: tailKey) { await scrollToTail(proxy) }
-    }
   }
-
-  /// Everything that changes which rows are on screen. `visible.count` covers
-  /// both a filter change and new lines, and the filter identity is in the key
-  /// too because two different filters can select the same number of rows.
-  private var tailKey: String {
-    "\(channel.rawValue)|\(level.rawValue)|\(needle)|\(followTail)|\(visible.count)"
-  }
-
-  /// Pin to the bottom, then pin again after one runloop beat.
-  ///
-  /// The second attempt is the load-bearing one: the anchor is the last item
-  /// of a `LazyVStack`, so on a channel or filter switch it has not been laid
-  /// out when the task starts, and `scrollTo` on an id that does not exist yet
-  /// is a silent no-op — which is what left the pane parked on line 1 with
-  /// "Following tail" lit. The task also re-arms on appear, so the first paint
-  /// of a freshly loaded tail lands at the bottom instead of the top.
-  private func scrollToTail(_ proxy: ScrollViewProxy) async {
-    guard followTail else { return }
-    proxy.scrollTo(Self.tailAnchor, anchor: .bottom)
-    try? await Task.sleep(for: .milliseconds(60))
-    guard !Task.isCancelled, followTail else { return }
-    proxy.scrollTo(Self.tailAnchor, anchor: .bottom)
-  }
-
-  private static let tailAnchor = "log-tail-anchor"
 
   private var filterBar: some View {
     VStack(alignment: .leading, spacing: 8) {
@@ -552,13 +498,6 @@ struct LogsView: View {
         : String(format: "%.1f MB", Double(bytes) / 1_048_576)
   }
 
-  /// A log line. With no query this is the plain string: building an
-  /// `AttributedString` per row costs real time over a 2 000-line tail and
-  /// buys nothing when nothing is searched.
-  private static func row(_ line: String, needle: String) -> Text {
-    needle.isEmpty ? Text(line) : Text(highlighted(line, needle: needle))
-  }
-
   /// Every occurrence of `needle` tinted and bolded, the rest verbatim. A
   /// filter that does not show *why* a 200-character line matched is half a
   /// filter. Non-private so `check_core.sh` can assert the run boundaries —
@@ -580,8 +519,9 @@ struct LogsView: View {
     return out + piece(rest, hit: false)
   }
 
-  /// Errors are worth spotting without reading every line.
-  private static func colour(for line: String) -> Color {
+  /// Errors are worth spotting without reading every line. Shared with
+  /// `LogText`, which renders the same colouring in AppKit.
+  nonisolated static func colour(for line: String) -> Color {
     let lower = line.lowercased()
     if lower.contains("error") || lower.contains("traceback")
       || lower.contains("exception") || lower.contains("failed")
