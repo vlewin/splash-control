@@ -3,10 +3,20 @@
 help: ## show targets
 	@grep -E '^[a-z]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-12s %s\n", $$1, $$2}'
 
-# A toolchain that ships the Testing module and matching SPM (Apple's Command Line Tools do not).
-# `brew install swift` on Apple Silicon; override for other prefixes/installations.
-SWIFT_TOOLCHAIN ?= /opt/homebrew/opt/swift
-export PATH := $(SWIFT_TOOLCHAIN)/bin:$(PATH)
+# One toolchain for build, test and app: Homebrew when installed, otherwise the
+# Command Line Tools'. Everything below runs on whichever this resolves to, so a
+# green `make verify` exercises the same compiler that assembles dist/Splash.app.
+SWIFT_TOOLCHAIN ?= $(if $(wildcard /opt/homebrew/opt/swift/bin/swift),/opt/homebrew/opt/swift)
+export PATH := $(if $(SWIFT_TOOLCHAIN),$(SWIFT_TOOLCHAIN)/bin:)$(PATH)
+
+# The Testing macro plugin sits in different places per toolchain: CLT buries
+# libTestingMacros.dylib under lib/swift/host/plugins/testing, a directory the
+# macro loader does not scan; Homebrew installs it where the loader looks. Pick
+# the flag from the chosen compiler instead of hardwiring xcrun.
+SWIFT_BIN := $(if $(SWIFT_TOOLCHAIN),$(SWIFT_TOOLCHAIN)/bin/swift,$(shell xcrun --find swift))
+SWIFT_PREFIX := $(patsubst %bin/swift,%,$(SWIFT_BIN))
+TESTING_PLUGINS := $(SWIFT_PREFIX)lib/swift/host/plugins/testing
+TESTING_PLUGIN_FLAGS := $(if $(wildcard $(TESTING_PLUGINS)),-Xswiftc -plugin-path -Xswiftc $(TESTING_PLUGINS))
 
 # Default to installed release SDK when CLT SDK is mismatched with Swift compiler
 SDKROOT ?= $(shell [ -d /Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk ] && echo /Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk || xcrun --show-sdk-path)
@@ -21,14 +31,8 @@ app: ## assemble dist/Splash.app
 check: ## script suites (core + agent-status)
 	bash Scripts/check_core.sh && bash Scripts/check_agent_status.sh
 
-test: ## swift-testing suite (Apple toolchain via xcrun)
-	# Runs on Apple's toolchain, not the Homebrew default: the Homebrew swift
-	# ships no SwiftUIMacros plugin, so the app-logic test target (which
-	# depends on the SwiftUI executable target) cannot compile with it.
-	# CLT additionally keeps libTestingMacros.dylib in a plugins/testing
-	# subdir the macro loader does not scan — the plugin-path flag restores
-	# it. Verified 2026-11-01 on CLT swift 6.4 / macOS 26.5 SDK.
-	xcrun swift test -Xswiftc -plugin-path -Xswiftc "$$(xcrun --find swift-frontend | xargs dirname)/../lib/swift/host/plugins/testing"
+test: ## swift-testing suite
+	swift test $(TESTING_PLUGIN_FLAGS)
 
 lint: ## formatter gate, zero warnings (strict)
 	xcrun swift-format lint --strict --recursive Sources
