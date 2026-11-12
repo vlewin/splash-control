@@ -157,6 +157,32 @@ func savedAutoDiskTierSurvivesDecode() throws {
   #expect(cfg.maxCacheDisk == nil)
 }
 
+// The tray's Zoom submenu: a closed percent set, tolerant decode like every
+// other field, and a factor that refuses anything outside the set.
+
+@Test("dashboard zoom defaults to 100%")
+func dashboardZoomDefaultsToHundred() {
+  #expect(SplashConfig().dashboardScale == 100)
+  #expect(SplashConfig().dashboardScaleFactor == 1)
+}
+
+@Test("a saved dashboard scale survives decode, a foreign one reads as 1.0")
+func savedDashboardScaleSurvivesDecode() throws {
+  let cfg = try JSONDecoder().decode(SplashConfig.self, from: Data(#"{"dashboardScale":150}"#.utf8))
+  #expect(cfg.dashboardScale == 150)
+  #expect(cfg.dashboardScaleFactor == 1.5)
+  // Decode itself stays tolerant (the raw value survives); only the factor
+  // guards, so a future set change cannot divide by a nonsense scale.
+  let odd = try JSONDecoder().decode(SplashConfig.self, from: Data(#"{"dashboardScale":110}"#.utf8))
+  #expect(odd.dashboardScale == 110)
+  #expect(odd.dashboardScaleFactor == 1)
+}
+
+@Test("the zoom steps are 100–200 in 25% increments")
+func dashboardZoomSteps() {
+  #expect(SplashConfig.dashboardScaleValues == [100, 125, 150, 175, 200])
+}
+
 @Test("expert RAM on auto warns only while the live store streams")
 func expertAutoWarning() throws {
   var store = try JSONDecoder().decode(

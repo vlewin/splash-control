@@ -348,6 +348,9 @@ final class TrayController: NSObject, NSMenuDelegate {
   private var contextMenuItems: [NSMenuItem] = []
   /// Last list the Context submenu was built from; guards the rebuild.
   private var contextIDs: [String] = []
+  private var zoomSelectItem: NSMenuItem!
+  private var zoomMenu: NSMenu!
+  private var zoomMenuItems: [NSMenuItem] = []
   private var startItem: NSMenuItem!
   private var restartItem: NSMenuItem!
   private var stopItem: NSMenuItem!
@@ -384,6 +387,24 @@ final class TrayController: NSObject, NSMenuDelegate {
     dashboardItem.keyEquivalent = "d"
     dashboardItem.keyEquivalentModifierMask = .command
     menu.addItem(dashboardItem)
+
+    // Static rows: the zoom set is closed, so unlike Model/Context this
+    // submenu is built once. The checkmark follows config (menuNeedsUpdate).
+    // It scales the dashboard window, so it lives under that item, not with
+    // the server operations below.
+    zoomMenu = NSMenu()
+    zoomSelectItem = NSMenuItem(title: "Zoom: 100%", action: nil, keyEquivalent: "")
+    zoomSelectItem.image = Self.menuIcon("plus.magnifyingglass")
+    zoomSelectItem.submenu = zoomMenu
+    for pct in SplashConfig.dashboardScaleValues {
+      let item = NSMenuItem(
+        title: "\(pct)%", action: #selector(selectZoom(_:)), keyEquivalent: "")
+      item.target = self
+      item.tag = pct
+      zoomMenu.addItem(item)
+      zoomMenuItems.append(item)
+    }
+    menu.addItem(zoomSelectItem)
 
     webuiItem = actionItem("Open WebUI", "safari", #selector(webuiAction))
     menu.addItem(webuiItem)
@@ -649,6 +670,18 @@ final class TrayController: NSObject, NSMenuDelegate {
     }
   }
 
+  @objc private func selectZoom(_ sender: NSMenuItem) {
+    let value = sender.tag
+    guard SplashConfig.dashboardScaleValues.contains(value),
+      config.config.dashboardScale != value
+    else { return }
+    // Purely a view setting: the config sink persists it and hands the step
+    // to AppDelegate.applyDashboardZoom, which re-maps the whole window
+    // (ZoomContainerView) and resizes the frame at the new step. The server
+    // never sees it.
+    config.config.dashboardScale = value
+  }
+
   /// Rebuilds the Model submenu from the models on disk. Called on every
   /// `menuWillOpen`, so the list the user looks at is never stale: a model
   /// installed from a terminal appears the next time the menu opens, with no
@@ -777,6 +810,11 @@ final class TrayController: NSObject, NSMenuDelegate {
     for item in contextMenuItems {
       item.state =
         (item.representedObject as? String) == (config.config.maxContext ?? "") ? .on : .off
+    }
+
+    zoomSelectItem.title = "Zoom: \(config.config.dashboardScale)%"
+    for item in zoomMenuItems {
+      item.state = item.tag == config.config.dashboardScale ? .on : .off
     }
 
     // The status line above shows the *serving* model and the menu checkmark

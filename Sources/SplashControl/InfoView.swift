@@ -18,6 +18,8 @@ import SwiftUI
 /// `StatsView` ×2), so extracting it would be a cross-cutting refactor of eight
 /// call sites for no behaviour change.
 struct InfoView: View {
+  @Environment(\.uiScale) private var uiScale
+  private var f: ScaledFont { ScaledFont(s: uiScale) }
   @ObservedObject var config: ConfigStore
   @ObservedObject var process: SplashProcess
   @ObservedObject var stats: StatsModel
@@ -58,10 +60,10 @@ struct InfoView: View {
           .resizable()
           .frame(width: 64, height: 64)
         Text("Splash Control")
-          .font(.title2.weight(.bold))
+          .font(f(.title2, .bold))
           .lineLimit(1)
         Text("macOS menu bar controller for the Splash LLM inference engine")
-          .font(.caption)
+          .font(f(.caption))
           .foregroundStyle(.secondary)
           .lineLimit(1)
         // Rigid, so the three capsules keep their natural widths and the
@@ -84,12 +86,12 @@ struct InfoView: View {
           VStack(alignment: .leading, spacing: 2) {
             HStack(spacing: 6) {
               Text("Splash Control")
-                .font(.subheadline.weight(.medium))
+                .font(f(.subheadline, .medium))
                 .lineLimit(1)
               statusBadge
             }
             Text(statusDetail)
-              .font(.caption)
+              .font(f(.caption))
               .foregroundStyle(.secondary)
               .lineLimit(1)
           }
@@ -101,14 +103,14 @@ struct InfoView: View {
           Divider().opacity(0.4)
           HStack(spacing: 6) {
             Image(systemName: "terminal")
-              .font(.caption2)
+              .font(f(.caption2))
               .foregroundStyle(.tertiary)
             Text("Installed via Homebrew Cask. You can update here or run ")
-              .font(.caption2)
+              .font(f(.caption2))
               .foregroundStyle(.tertiary)
               .lineLimit(1)
             Text("brew upgrade --cask splash-control")
-              .font(.system(.caption2, design: .monospaced))
+              .font(f(.caption2, nil, design: .monospaced))
               .foregroundStyle(.secondary)
               .lineLimit(1)
           }
@@ -127,35 +129,35 @@ struct InfoView: View {
         .controlSize(.mini)
     case .upToDate:
       Text("Latest")
-        .font(.caption2.weight(.medium))
+        .font(f(.caption2, .medium))
         .padding(.horizontal, 6)
         .padding(.vertical, 2)
         .background(Color.green.opacity(0.15), in: Capsule())
         .foregroundStyle(.green)
     case .updateAvailable(let release):
       Text("v\(release.version) Available")
-        .font(.caption2.weight(.medium))
+        .font(f(.caption2, .medium))
         .padding(.horizontal, 6)
         .padding(.vertical, 2)
         .background(Color.accentColor.opacity(0.15), in: Capsule())
         .foregroundStyle(Color.accentColor)
     case .downloading:
       Text("Downloading")
-        .font(.caption2.weight(.medium))
+        .font(f(.caption2, .medium))
         .padding(.horizontal, 6)
         .padding(.vertical, 2)
         .background(Color.accentColor.opacity(0.15), in: Capsule())
         .foregroundStyle(Color.accentColor)
     case .readyToRestart:
       Text("Ready to Relaunch")
-        .font(.caption2.weight(.medium))
+        .font(f(.caption2, .medium))
         .padding(.horizontal, 6)
         .padding(.vertical, 2)
         .background(Color.green.opacity(0.15), in: Capsule())
         .foregroundStyle(.green)
     case .failed:
       Text("Check Failed")
-        .font(.caption2.weight(.medium))
+        .font(f(.caption2, .medium))
         .padding(.horizontal, 6)
         .padding(.vertical, 2)
         .background(Color.red.opacity(0.15), in: Capsule())
@@ -190,14 +192,16 @@ struct InfoView: View {
         Task { await updates.checkForUpdates(silent: false) }
       } label: {
         Label("Check for Updates", systemImage: "arrow.clockwise")
+          .font(f(size: 11))
       }
-      .controlSize(.small)
+      .zoomButton()
     case .checking:
       Button {
       } label: {
         Label("Checking...", systemImage: "arrow.clockwise")
+          .font(f(size: 11))
       }
-      .controlSize(.small)
+      .zoomButton()
       .disabled(true)
     case .updateAvailable(let release):
       HStack(spacing: 8) {
@@ -205,16 +209,17 @@ struct InfoView: View {
           NSWorkspace.shared.open(release.htmlURL)
         } label: {
           Text("Release Notes")
+            .font(f(size: 11))
         }
-        .controlSize(.small)
+        .zoomButton()
 
         Button {
           updates.downloadAndInstall(release: release)
         } label: {
           Label("Update Now", systemImage: "arrow.down.circle.fill")
+            .font(f(size: 11))
         }
-        .buttonStyle(.borderedProminent)
-        .controlSize(.small)
+        .zoomButton(prominent: true)
       }
     case .downloading(let progress):
       ProgressView(value: progress)
@@ -247,10 +252,10 @@ struct InfoView: View {
         HStack(spacing: 8) {
           VStack(alignment: .leading, spacing: 2) {
             Text("Config")
-              .font(.subheadline.weight(.medium))
+              .font(f(.subheadline, .medium))
               .lineLimit(1)
             Text(displayConfigPath)
-              .font(.system(.caption, design: .monospaced))
+              .font(f(.caption, nil, design: .monospaced))
               .foregroundStyle(.tertiary)
               .lineLimit(1)
               .truncationMode(.middle)
@@ -261,8 +266,9 @@ struct InfoView: View {
             NSWorkspace.shared.activateFileViewerSelecting([ConfigStore.configURL()])
           } label: {
             Label("Reveal in Finder", systemImage: "folder")
+              .font(f(size: 11))
           }
-          .controlSize(.small)
+          .zoomButton()
         }
       }
     }
@@ -278,10 +284,10 @@ struct InfoView: View {
       HStack(spacing: 12) {
         HStack(spacing: 8) {
           Image(systemName: "heart.fill")
-            .font(.system(size: 14))
+            .font(f(size: 14))
             .foregroundStyle(.pink)
           Text("Splash LLM Runtime by IncoAI — special thanks for open-sourcing this engine.")
-            .font(.caption)
+            .font(f(.caption))
             .foregroundStyle(.secondary)
             .lineLimit(1)
         }
@@ -292,26 +298,28 @@ struct InfoView: View {
           }
         } label: {
           Label("Splash on GitHub", systemImage: "arrow.up.right.square")
+            .font(f(size: 11))
         }
-        .controlSize(.small)
+        .zoomButton()
         Button {
           if let url = URL(string: "https://github.com/incoai") {
             NSWorkspace.shared.open(url)
           }
         } label: {
           Label("IncoAI", systemImage: "person.2")
+            .font(f(size: 11))
         }
-        .controlSize(.small)
+        .zoomButton()
       }
     }
   }
 
   private func badge(_ text: String) -> some View {
     Text(text)
-      .font(.caption2.weight(.medium))
+      .font(f(.caption2, .medium))
       .lineLimit(1)
-      .padding(.horizontal, 8)
-      .padding(.vertical, 3)
+      .padding(.horizontal, 8 * uiScale)
+      .padding(.vertical, 3 * uiScale)
       .background(Color.primary.opacity(0.07), in: Capsule())
   }
 
@@ -333,7 +341,7 @@ struct InfoView: View {
   {
     cardChrome {
       Text(title.uppercased())
-        .font(.caption2.weight(.bold))
+        .font(f(.caption2, .bold))
         .foregroundStyle(.secondary)
       content()
     }

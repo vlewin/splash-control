@@ -8,6 +8,8 @@ import SwiftUI
 /// - Clear domain separation between passive accumulated telemetry across serving sessions
 ///   and active synthetic multi-model benchmarking.
 struct StatsView: View {
+  @Environment(\.uiScale) private var uiScale
+  private var f: ScaledFont { ScaledFont(s: uiScale) }
   @ObservedObject var stats: ModelStats
   @ObservedObject var bench: BenchmarkEngine
   var onReset: () -> Void = {}
@@ -23,11 +25,11 @@ struct StatsView: View {
     ("min", "MIN"), ("p50", "P50"), ("avg", "AVG"),
     ("p95", "P95"), ("max", "MAX"),
   ]
-  private let metricColWidth: CGFloat = 110
-  private let colWidth: CGFloat = 65
-  private let avgColWidth: CGFloat = 70
-  private let unitColWidth: CGFloat = 48
-  private let countColWidth: CGFloat = 58
+  private var metricColWidth: CGFloat { 110 * uiScale }
+  private var colWidth: CGFloat { 65 * uiScale }
+  private var avgColWidth: CGFloat { 70 * uiScale }
+  private var unitColWidth: CGFloat { 48 * uiScale }
+  private var countColWidth: CGFloat { 58 * uiScale }
 
   var body: some View {
     ScrollView {
@@ -73,9 +75,9 @@ struct StatsView: View {
     HStack(alignment: .center) {
       VStack(alignment: .leading, spacing: 2) {
         Text("Model Performance History")
-          .font(.title3.weight(.semibold))
+          .font(f(.title3, .semibold))
         Text("Aggregated telemetry across serving sessions and restarts")
-          .font(.caption)
+          .font(f(.caption))
           .foregroundStyle(.secondary)
       }
       Spacer()
@@ -84,8 +86,9 @@ struct StatsView: View {
         onReset()
       } label: {
         Label("Reset All", systemImage: "arrow.counterclockwise")
+          .font(f(size: 11))
       }
-      .controlSize(.small)
+      .zoomButton()
       .disabled(stats.rows.isEmpty)
     }
   }
@@ -94,10 +97,10 @@ struct StatsView: View {
     VStack(alignment: .leading, spacing: 14) {
       HStack(alignment: .center, spacing: 10) {
         Image(systemName: "cpu")
-          .font(.subheadline)
+          .font(f(.subheadline))
           .foregroundStyle(.secondary)
         Text(row.key.model)
-          .font(.system(size: 13, weight: .semibold, design: .monospaced))
+          .font(f(size: 13, weight: .semibold, design: .monospaced))
           .lineLimit(1)
           .truncationMode(.middle)
 
@@ -112,7 +115,7 @@ struct StatsView: View {
           Label("Reset", systemImage: "trash")
         }
         .buttonStyle(.borderless)
-        .font(.caption)
+        .font(f(.caption))
         .foregroundStyle(.secondary)
         .help("Reset telemetry for this model configuration")
       }
@@ -141,11 +144,11 @@ struct StatsView: View {
 
       HStack(spacing: 4) {
         Image(systemName: "info.circle")
-          .font(.caption2)
+          .font(f(.caption2))
         Text(
           "min/avg/max cover all recorded history · p50/p95 cover the most recent \(ModelStats.Reservoir().limit) samples"
         )
-        .font(.system(size: 10))
+        .font(f(size: 10))
       }
       .foregroundStyle(.tertiary)
     }
@@ -177,10 +180,10 @@ struct StatsView: View {
 
   private func chip(_ text: String) -> some View {
     Text(text)
-      .font(.system(size: 10, weight: .medium, design: .monospaced))
+      .font(f(size: 10, weight: .medium, design: .monospaced))
       .foregroundStyle(.secondary)
-      .padding(.horizontal, 6)
-      .padding(.vertical, 2)
+      .padding(.horizontal, 6 * uiScale)
+      .padding(.vertical, 2 * uiScale)
       .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 4))
   }
 
@@ -197,7 +200,7 @@ struct StatsView: View {
       Text("SAMPLES")
         .frame(width: countColWidth, alignment: .trailing)
     }
-    .font(.system(size: 10, weight: .bold))
+    .font(f(size: 10, weight: .bold))
     .foregroundStyle(.tertiary)
   }
 
@@ -216,11 +219,11 @@ struct StatsView: View {
     return HStack(spacing: 12) {
       HStack(spacing: 6) {
         Image(systemName: icon)
-          .font(.system(size: 11))
+          .font(f(size: 11))
           .foregroundStyle(iconColor)
           .frame(width: 14)
         Text(name)
-          .font(.system(size: 12, weight: .medium))
+          .font(f(size: 12, weight: .medium))
       }
       .frame(width: metricColWidth, alignment: .leading)
 
@@ -228,7 +231,7 @@ struct StatsView: View {
         let (formatted, _) = pair
         let isAvg = (i == 2)
         Text(formatted)
-          .font(.system(size: 12, weight: isAvg ? .bold : .regular, design: .monospaced))
+          .font(f(size: 12, weight: isAvg ? .bold : .regular, design: .monospaced))
           .monospacedDigit()
           .foregroundStyle(
             formatted == "—"
@@ -239,12 +242,12 @@ struct StatsView: View {
       }
 
       Text(unit)
-        .font(.system(size: 10))
+        .font(f(size: 10))
         .foregroundStyle(.tertiary)
         .frame(width: unitColWidth, alignment: .leading)
 
       Text(agg.count > 0 ? String(agg.count) : "—")
-        .font(.system(size: 11, design: .monospaced))
+        .font(f(size: 11, design: .monospaced))
         .monospacedDigit()
         .foregroundStyle(.tertiary)
         .frame(width: countColWidth, alignment: .trailing)
@@ -261,13 +264,13 @@ struct StatsView: View {
   private var emptyState: some View {
     VStack(spacing: 12) {
       Image(systemName: "chart.bar.xaxis")
-        .font(.system(size: 36))
+        .font(f(size: 36))
         .foregroundStyle(.tertiary)
       Text("No Model Telemetry Recorded")
-        .font(.subheadline.weight(.semibold))
+        .font(f(.subheadline, .semibold))
         .foregroundStyle(.secondary)
       Text("Telemetry accumulates automatically once requests are decoded or prefilled.")
-        .font(.caption)
+        .font(f(.caption))
         .foregroundStyle(.tertiary)
         .multilineTextAlignment(.center)
     }

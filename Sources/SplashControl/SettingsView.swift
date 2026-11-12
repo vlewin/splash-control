@@ -10,6 +10,8 @@ import SwiftUI
 /// Every row across all sub-tabs adheres to the consistent macOS form pattern:
 /// Title and human-readable explanation on the left, right-aligned control on the right.
 struct SettingsView: View {
+  @Environment(\.uiScale) private var uiScale
+  private var f: ScaledFont { ScaledFont(s: uiScale) }
   @ObservedObject var config: ConfigStore
   @ObservedObject var process: SplashProcess
   @ObservedObject var stats: StatsModel
@@ -59,7 +61,7 @@ struct SettingsView: View {
 
         HStack {
           Text("Preset: \(activePresetName)")
-            .font(.caption2)
+            .font(f(.caption2))
             .foregroundStyle(.tertiary)
           Spacer()
           if let onClose {
@@ -97,7 +99,7 @@ struct SettingsView: View {
   {
     cardChrome {
       Text(title.uppercased())
-        .font(.caption2.weight(.bold))
+        .font(f(.caption2, .bold))
         .foregroundStyle(.secondary)
       content()
     }
@@ -116,16 +118,16 @@ struct SettingsView: View {
     HStack(alignment: .center, spacing: 12) {
       VStack(alignment: .leading, spacing: 2) {
         Text(title)
-          .font(.subheadline.weight(.medium))
+          .font(f(.subheadline, .medium))
           .lineLimit(1)
         if let warning, !warning.isEmpty {
           Label(warning, systemImage: "exclamationmark.triangle.fill")
-            .font(.caption)
+            .font(f(.caption))
             .foregroundStyle(Color.orange)
             .lineLimit(1)
         } else {
           Text(subtitle)
-            .font(.caption)
+            .font(f(.caption))
             .foregroundStyle(.tertiary)
             .lineLimit(1)
         }
@@ -147,9 +149,10 @@ struct SettingsView: View {
     help: String? = nil
   ) -> some View {
     formRow(title, subtitle, warning: warning, help: help, disabled: disabled) {
-      Toggle("", isOn: isOn)
-        .toggleStyle(.switch)
-        .labelsHidden()
+      // Vector switch (ZoomSwitch), not `.toggleStyle(.switch)`: the AppKit
+      // cell draws one of three fixed sizes and would sit stubby next to
+      // step-scaled labels.
+      ZoomSwitch(isOn: isOn)
     }
   }
 
@@ -169,19 +172,19 @@ struct SettingsView: View {
               VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 6) {
                   Image(systemName: preset.icon)
-                    .font(.system(size: 13, weight: .medium))
+                    .font(f(size: 13, weight: .medium))
                     .foregroundStyle(isActive ? Color.accentColor : .secondary)
                   Text(preset.title)
-                    .font(.subheadline.weight(.semibold))
+                    .font(f(.subheadline, .semibold))
                     .foregroundStyle(.primary)
                     .lineLimit(1)
                   Spacer(minLength: 4)
                   if isActive {
                     HStack(spacing: 3) {
                       Image(systemName: "checkmark")
-                        .font(.system(size: 8, weight: .bold))
+                        .font(f(size: 8, weight: .bold))
                       Text("ACTIVE")
-                        .font(.system(size: 9, weight: .bold))
+                        .font(f(size: 9, weight: .bold))
                     }
                     .foregroundStyle(Color.accentColor)
                     .padding(.horizontal, 6)
@@ -189,13 +192,13 @@ struct SettingsView: View {
                     .background(Color.accentColor.opacity(0.12), in: Capsule())
                   } else {
                     Text(preset.tagline)
-                      .font(.system(size: 9, weight: .medium))
+                      .font(f(size: 9, weight: .medium))
                       .foregroundStyle(.tertiary)
                       .lineLimit(1)
                   }
                 }
                 Text(preset.specSummary)
-                  .font(.system(size: 11, weight: .medium, design: .monospaced))
+                  .font(f(size: 11, weight: .medium, design: .monospaced))
                   .foregroundStyle(isActive ? .primary : .secondary)
                   .lineLimit(1)
               }
@@ -223,7 +226,7 @@ struct SettingsView: View {
         }
 
         Text(presetsFootnote)
-          .font(.caption)
+          .font(f(.caption))
           .foregroundStyle(.tertiary)
           .lineLimit(1)
           .help(
@@ -260,7 +263,7 @@ struct SettingsView: View {
         ) {
           HStack(spacing: 6) {
             Text("http://127.0.0.1:\(String(config.config.port))/v1")
-              .font(.system(.callout, design: .monospaced))
+              .font(f(.callout, nil, design: .monospaced))
               .foregroundStyle(Color.accentColor)
               .lineLimit(1)
               .textSelection(.enabled)
@@ -277,7 +280,7 @@ struct SettingsView: View {
                 Image(systemName: copiedEndpoint ? "checkmark" : "doc.on.doc")
                 Text(copiedEndpoint ? "Copied" : "Copy")
               }
-              .font(.caption2.weight(.medium))
+              .font(f(.caption2, .medium))
               .foregroundStyle(copiedEndpoint ? Color.green : Color.primary)
               .padding(.horizontal, 6)
               .padding(.vertical, 2)
@@ -287,7 +290,7 @@ struct SettingsView: View {
             .help("Copy http://127.0.0.1:\(String(config.config.port))/v1")
           }
           .padding(.horizontal, 8)
-          .frame(height: 24)
+          .frame(height: 24 * uiScale)  // pill wraps the mono endpoint text — must grow with it
           .background(Color.primary.opacity(0.03), in: RoundedRectangle(cornerRadius: 6))
           .overlay(
             RoundedRectangle(cornerRadius: 6).stroke(Color.primary.opacity(0.06), lineWidth: 0.5))
@@ -309,8 +312,8 @@ struct SettingsView: View {
             "The port splash serve listens on. It is also this app's base URL, and the port the tray polls."
         ) {
           TextField("8000", value: $config.config.port, format: .number.grouping(.never))
-            .textFieldStyle(.roundedBorder)
-            .frame(width: 140, alignment: .trailing)
+            .zoomField()
+            .frame(width: 240 * uiScale, alignment: .trailing)
         }
 
         Divider().opacity(0.4)
@@ -336,8 +339,8 @@ struct SettingsView: View {
               }
             )
           )
-          .textFieldStyle(.roundedBorder)
-          .frame(width: 140, alignment: .trailing)
+          .zoomField()
+          .frame(width: 240 * uiScale, alignment: .trailing)
         }
 
         // Context Window
@@ -365,8 +368,10 @@ struct SettingsView: View {
             }
           }
           .pickerStyle(.menu)
+          .controlSize(uiScale.zoomedControlSize(base: .regular))
+          .font(f(size: 13))
           .labelsHidden()
-          .frame(width: 190, alignment: .trailing)
+          .frame(width: 190 * uiScale, alignment: .trailing)
         }
 
         // KV Cache Precision
@@ -386,8 +391,10 @@ struct SettingsView: View {
             Text("BF16 (Full Precision)").tag("bf16")
           }
           .pickerStyle(.menu)
+          .controlSize(uiScale.zoomedControlSize(base: .regular))
+          .font(f(size: 13))
           .labelsHidden()
-          .frame(width: 190, alignment: .trailing)
+          .frame(width: 190 * uiScale, alignment: .trailing)
         }
 
         // Recurrent State Format (splash 1.3.2+)
@@ -408,8 +415,10 @@ struct SettingsView: View {
             Text("BF16 (Half Size)").tag("bf16")
           }
           .pickerStyle(.menu)
+          .controlSize(uiScale.zoomedControlSize(base: .regular))
+          .font(f(size: 13))
           .labelsHidden()
-          .frame(width: 190, alignment: .trailing)
+          .frame(width: 190 * uiScale, alignment: .trailing)
         }
 
         // Idle Release
@@ -429,8 +438,8 @@ struct SettingsView: View {
               }
             )
           )
-          .textFieldStyle(.roundedBorder)
-          .frame(width: 140, alignment: .trailing)
+          .zoomField()
+          .frame(width: 240 * uiScale, alignment: .trailing)
         }
 
         // Purge Model Weights (On-demand POST /v1/memory/release, splash 1.3.2+)
@@ -456,9 +465,10 @@ struct SettingsView: View {
                 Image(systemName: "arrow.down.to.line.compact")
                 Text(isReleased ? "Purged" : "Purge Now")
               }
+              .font(f(size: 11))
             }
             .disabled(!isServing || isReleased || isPurging)
-            .controlSize(.small)
+            .zoomButton()
           }
         }
 
@@ -511,8 +521,10 @@ struct SettingsView: View {
               }
             }
             .pickerStyle(.menu)
+            .controlSize(uiScale.zoomedControlSize(base: .regular))
+            .font(f(size: 13))
             .labelsHidden()
-            .frame(width: 190, alignment: .trailing)
+            .frame(width: 190 * uiScale, alignment: .trailing)
 
             if isCustomTier {
               TextField(
@@ -525,8 +537,8 @@ struct SettingsView: View {
                   }
                 )
               )
-              .textFieldStyle(.roundedBorder)
-              .frame(width: 70, alignment: .trailing)
+              .zoomField()
+              .frame(width: 70 * uiScale, alignment: .trailing)
             }
           }
         }
@@ -590,8 +602,10 @@ struct SettingsView: View {
           Text("All (Reproducible)").tag("all")
         }
         .pickerStyle(.menu)
+        .controlSize(uiScale.zoomedControlSize(base: .regular))
+        .font(f(size: 13))
         .labelsHidden()
-        .frame(width: 190, alignment: .trailing)
+        .frame(width: 190 * uiScale, alignment: .trailing)
       }
     }
   }
@@ -622,8 +636,8 @@ struct SettingsView: View {
           }
         )
       )
-      .textFieldStyle(.roundedBorder)
-      .frame(width: 140, alignment: .trailing)
+      .zoomField()
+      .frame(width: 240 * uiScale, alignment: .trailing)
     }
   }
 
@@ -740,8 +754,8 @@ struct SettingsView: View {
               }
             )
           )
-          .textFieldStyle(.roundedBorder)
-          .frame(width: 240, alignment: .trailing)
+          .zoomField()
+          .frame(width: 240 * uiScale, alignment: .trailing)
         }
 
         formRow(
@@ -759,8 +773,8 @@ struct SettingsView: View {
               }
             )
           )
-          .textFieldStyle(.roundedBorder)
-          .frame(width: 240, alignment: .trailing)
+          .zoomField()
+          .frame(width: 240 * uiScale, alignment: .trailing)
         }
 
         formRow(
@@ -777,8 +791,8 @@ struct SettingsView: View {
               }
             )
           )
-          .textFieldStyle(.roundedBorder)
-          .frame(width: 240, alignment: .trailing)
+          .zoomField()
+          .frame(width: 240 * uiScale, alignment: .trailing)
         }
 
         formRow(
@@ -795,8 +809,8 @@ struct SettingsView: View {
               }
             )
           )
-          .textFieldStyle(.roundedBorder)
-          .frame(width: 140, alignment: .trailing)
+          .zoomField()
+          .frame(width: 240 * uiScale, alignment: .trailing)
         }
 
         formRow(
@@ -813,8 +827,8 @@ struct SettingsView: View {
               }
             )
           )
-          .textFieldStyle(.roundedBorder)
-          .frame(width: 140, alignment: .trailing)
+          .zoomField()
+          .frame(width: 240 * uiScale, alignment: .trailing)
         }
 
         formRow(
@@ -832,8 +846,8 @@ struct SettingsView: View {
               }
             )
           )
-          .textFieldStyle(.roundedBorder)
-          .frame(width: 240, alignment: .trailing)
+          .zoomField()
+          .frame(width: 240 * uiScale, alignment: .trailing)
         }
 
         toggleRow(
@@ -862,8 +876,10 @@ struct SettingsView: View {
             }
           }
           .pickerStyle(.menu)
+          .controlSize(uiScale.zoomedControlSize(base: .regular))
+          .font(f(size: 13))
           .labelsHidden()
-          .frame(width: 190, alignment: .trailing)
+          .frame(width: 190 * uiScale, alignment: .trailing)
         }
 
         Divider().opacity(0.4)
@@ -883,10 +899,10 @@ struct SettingsView: View {
 
         VStack(alignment: .leading, spacing: 4) {
           Text("Extra Serve Args")
-            .font(.subheadline.weight(.medium))
+            .font(f(.subheadline, .medium))
             .lineLimit(1)
           Text("Only flags with no control above · appended verbatim")
-            .font(.caption)
+            .font(f(.caption))
             .foregroundStyle(.tertiary)
             .lineLimit(1)
           TextEditor(
@@ -898,7 +914,7 @@ struct SettingsView: View {
               }
             )
           )
-          .font(.system(.body, design: .monospaced))
+          .font(f(.body, nil, design: .monospaced))
           .frame(minHeight: 56, maxHeight: 84)
           .padding(4)
           .background(Color.primary.opacity(0.03), in: RoundedRectangle(cornerRadius: 6))
@@ -916,7 +932,7 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 6) {
           HStack {
             Text("LAUNCH COMMAND")
-              .font(.caption2.weight(.bold))
+              .font(f(.caption2, .bold))
               .foregroundStyle(.secondary)
             Spacer()
             Button {
@@ -927,7 +943,7 @@ struct SettingsView: View {
                 Image(systemName: "doc.on.doc")
                 Text("Copy Command")
               }
-              .font(.caption2.weight(.medium))
+              .font(f(.caption2, .medium))
               .padding(.horizontal, 6)
               .padding(.vertical, 2)
               .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 5))
@@ -936,7 +952,7 @@ struct SettingsView: View {
           }
 
           Text(process.launchCommandPreview)
-            .font(.system(.caption, design: .monospaced))
+            .font(f(.caption, nil, design: .monospaced))
             .textSelection(.enabled)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(10)

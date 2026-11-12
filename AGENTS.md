@@ -116,6 +116,7 @@ This section accumulates concrete corrections. When corrected on your approach, 
   - Never commit or push without explicit user approval — stage, show the diff and proposed message, wait for confirmation.
   - Never start a shell-command line with `=` (`===` separators) — zsh expands a leading `=` to a command path; use `---` instead.
   - Never evaluate O(N) bucketing or geometry inside Chart/ForEach mark closures — hoist once before the builder.
+ - Never stop the `splash` server during a session — the agent session runs on it. Quitting the tray quits splash too (quit flow stops the server unless stop-on-quit is off): relaunching the tray kills the session. Only a UI-visible change (§ 11) justifies a relaunch — and even then announce it first, the user restarts splash for the agent to return.
 - *Rotation / prune test*: keep this log to ≤ 10 entries (fold durable rules into their section when it exceeds); every few weeks, delete any line whose removal would cause no mistake.
 - *Size budget*: ≤ ~320 lines / ≤ 20 KB — 2026 guidance (vLLM caps at 200/300 lines, Codex truncates at 32 KiB). New detail goes to a reference doc, not here.
 
@@ -179,6 +180,11 @@ binary proves the code compiles; a stale bundle is worse than no build.
 
 After any change to behaviour, UI or Settings:
 
+Only **UI-visible** changes need the full relaunch-and-inspect loop below.
+For pure logic/behaviour changes, `make app` plus the gates is enough — a
+relaunch stops the `splash` server through the tray's quit flow (§ 9
+learning) and buys nothing a test run does not already prove.
+
 1. `make app` — not `make build` alone.
 2. Quit the running copy, then `open dist/Splash.app`.
 3. Confirm the live process path (`ps -Ao pid,command`) really is
@@ -201,7 +207,7 @@ Read [DESIGN.md](DESIGN.md) before touching any SwiftUI view (which sections: §
 
 `check_core.sh` carries static `lint:` greps that pin these shapes. They run in milliseconds; run them.
 
-Local override: task is not complete until make verify green, dist/Splash.app rebuilt + relaunched, changes committed on a feature branch with explicit approval (§9); §14 8-section report shape binds.
+Local override: task is not complete until make verify green, dist/Splash.app rebuilt (+ relaunched for UI-visible changes), changes committed on a feature branch with explicit approval (§9); §14 8-section report shape binds.
 
 ### Commit on completion
 

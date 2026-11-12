@@ -8,6 +8,8 @@ import SwiftUI
 /// - Configuration and status housed in styled container cards.
 /// - Tabular results aligned with monospaced figures and clear scenario inspection.
 struct BenchSection: View {
+  @Environment(\.uiScale) private var uiScale
+  private var f: ScaledFont { ScaledFont(s: uiScale) }
   @ObservedObject var bench: BenchmarkEngine
   /// Track expanded scenario preview per model. Keyed by model ID, value is promptID.
   @State private var expandedPromptByModel: [String: String] = [:]
@@ -47,10 +49,10 @@ struct BenchSection: View {
     HStack(alignment: .center, spacing: 12) {
       VStack(alignment: .leading, spacing: 2) {
         Text("Model Benchmark Suite")
-          .font(.title3.weight(.semibold))
+          .font(f(.title3, .semibold))
           .lineLimit(1)
         Text("Standardized synthetic evaluation across installed models under fixed rule sets.")
-          .font(.caption)
+          .font(f(.caption))
           .foregroundStyle(.secondary)
           .lineLimit(1)
       }
@@ -67,19 +69,19 @@ struct BenchSection: View {
     let busy = bench.phase != .idle && bench.phase != .done
     let content = HStack(spacing: 6) {
       Image(systemName: bench.runs.count > 1 ? "clock.arrow.circlepath" : "clock")
-        .font(.caption2)
+        .font(f(.caption2))
       Text(bench.runs.count > 1 ? bench.selectedRunSummary : bench.lastRunBadgeText)
-        .font(.caption2)
+        .font(f(.caption2))
         .lineLimit(1)
       if bench.runs.count > 1 {
         Image(systemName: "chevron.up.chevron.down")
-          .font(.system(size: 8))
+          .font(f(size: 8))
       }
     }
     .foregroundStyle(.secondary)
     .padding(.horizontal, 10)
     .padding(.vertical, 5)
-    .frame(width: 380, alignment: .trailing)
+    .frame(width: 380 * uiScale, alignment: .trailing)
     .background(Color.primary.opacity(0.04), in: Capsule())
 
     return Group {
@@ -119,7 +121,7 @@ struct BenchSection: View {
           content
         }
         .menuStyle(.borderlessButton)
-        .frame(width: 380, alignment: .trailing)
+        .frame(width: 380 * uiScale, alignment: .trailing)
         .help(
           "Stored benchmark runs, one per parameter set. Re-running a set replaces its entry; a run under different settings is kept beside it."
         )
@@ -135,10 +137,10 @@ struct BenchSection: View {
   private var emptyState: some View {
     VStack(spacing: 10) {
       Image(systemName: "gauge.with.dots.needle.bottom.50percent")
-        .font(.system(size: 32))
+        .font(f(size: 32))
         .foregroundStyle(.tertiary)
       Text("No Benchmark Recorded for \(bench.longContextK)K Context")
-        .font(.headline)
+        .font(f(.headline))
         .foregroundStyle(.secondary)
       Text(
         "Run Benchmark to measure model throughput, prefill latency and memory under a "
@@ -148,7 +150,7 @@ struct BenchSection: View {
             : " \(bench.runs.count) other parameter set\(bench.runs.count == 1 ? " is" : "s are") "
               + "stored — pick one from the menu above to compare.")
       )
-      .font(.caption)
+      .font(f(.caption))
       .foregroundStyle(.tertiary)
       .multilineTextAlignment(.center)
     }
@@ -167,7 +169,7 @@ struct BenchSection: View {
   private var configCard: some View {
     VStack(alignment: .leading, spacing: 14) {
       Text("BENCHMARK CONFIGURATION")
-        .font(.caption2.weight(.bold))
+        .font(f(.caption2, .bold))
         .foregroundStyle(.secondary)
 
       // Three columns, not two spacers. Equal flexible wings around a rigid centre
@@ -197,7 +199,7 @@ struct BenchSection: View {
         HStack(spacing: 12) {
           HStack(spacing: 8) {
             Text("Context:")
-              .font(.subheadline)
+              .font(f(.subheadline))
               .foregroundStyle(.secondary)
               .lineLimit(1)
             FixedSegmented(
@@ -207,21 +209,21 @@ struct BenchSection: View {
                 get: { bench.longContextK },
                 set: { bench.setLongContext($0) })
             )
-            .frame(width: 228)
+            .frame(width: 228 * uiScale)
             .disabled(bench.phase != .idle && bench.phase != .done)
             .help("Size of the long-context scenario (KV cache stress test).")
           }
           .fixedSize()
           HStack(spacing: 8) {
             Text("ANE:")
-              .font(.subheadline)
+              .font(f(.subheadline))
               .foregroundStyle(.secondary)
               .lineLimit(1)
             FixedSegmented(
               width: 100, titles: ["on", "off"], values: [true, false],
               selection: $bench.aneEnabled
             )
-            .frame(width: 100)
+            .frame(width: 100 * uiScale)
             .disabled(bench.phase != .idle && bench.phase != .done)
             .help(
               "Neural Engine prefill split for this run. on = the 1.3.0 default, "
@@ -262,7 +264,7 @@ struct BenchSection: View {
           Text(
             "Server not owned by this tray — use Restart Server in the menu bar first to benchmark installed models."
           )
-          .font(.caption)
+          .font(f(.caption))
           .foregroundStyle(.orange)
         }
         .padding(10)
@@ -335,7 +337,7 @@ struct BenchSection: View {
     let isRunning = bench.phase != .idle && bench.phase != .done
     return HStack(spacing: 8) {
       Text("SELECTED MODELS:")
-        .font(.system(size: 10, weight: .bold))
+        .font(f(size: 10, weight: .bold))
         .foregroundStyle(.secondary)
 
       if isRunning {
@@ -348,18 +350,18 @@ struct BenchSection: View {
             switch status {
             case .completed:
               Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 11))
+                .font(f(size: 11))
                 .foregroundStyle(.green)
             case .active:
               ProgressView()
                 .controlSize(.mini)
             case .queued, .none:
               Text("\(idx + 1)")
-                .font(.system(size: 10, weight: .bold, design: .monospaced))
+                .font(f(size: 10, weight: .bold, design: .monospaced))
                 .foregroundStyle(.tertiary)
             }
             Text(ModelCatalog.displayName(for: model))
-              .font(.system(size: 11, design: .monospaced))
+              .font(f(size: 11, design: .monospaced))
               .fontWeight(status.isActive ? .bold : .regular)
               .foregroundStyle(
                 status == .completed
@@ -369,7 +371,7 @@ struct BenchSection: View {
               .lineLimit(1)
             if case .active(let done) = status {
               Text("(\(done)/\(bench.scenarioCount))")
-                .font(.system(size: 10, design: .monospaced))
+                .font(f(size: 10, design: .monospaced))
                 .foregroundStyle(.blue)
                 .lineLimit(1)
             }
@@ -378,7 +380,7 @@ struct BenchSection: View {
 
           if idx < bench.plan.count - 1 {
             Image(systemName: "arrow.right")
-              .font(.system(size: 8))
+              .font(f(size: 8))
               .foregroundStyle(.quaternary)
           }
         }
@@ -395,10 +397,10 @@ struct BenchSection: View {
           } label: {
             HStack(spacing: 4) {
               Image(systemName: isSelected ? "checkmark.square.fill" : "square")
-                .font(.system(size: 11))
+                .font(f(size: 11))
                 .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
               Text(ModelCatalog.displayName(for: model))
-                .font(.system(size: 11, design: .monospaced))
+                .font(f(size: 11, design: .monospaced))
                 .foregroundStyle(isSelected ? Color.primary : Color.secondary.opacity(0.6))
             }
           }
@@ -437,7 +439,7 @@ struct BenchSection: View {
     return VStack(alignment: .leading, spacing: 14) {
       HStack(alignment: .firstTextBaseline) {
         Text("BENCHMARK COMPARISON")
-          .font(.caption2.weight(.bold))
+          .font(f(.caption2, .bold))
           .foregroundStyle(.secondary)
         Spacer()
         HStack(spacing: 12) {
@@ -447,7 +449,7 @@ struct BenchSection: View {
                 .fill(modelColor(for: model))
                 .frame(width: 6, height: 6)
               Text(ModelCatalog.displayName(for: model))
-                .font(.system(size: 10, weight: .medium))
+                .font(f(size: 10, weight: .medium))
                 .foregroundStyle(.secondary)
             }
           }
@@ -462,7 +464,7 @@ struct BenchSection: View {
         Text(
           "No model has finished all \(bench.scenarioCount) scenarios yet — bars appear as each one completes."
         )
-        .font(.caption)
+        .font(f(.caption))
         .foregroundStyle(.tertiary)
         .frame(maxWidth: .infinity, minHeight: 60, alignment: .leading)
       } else {
@@ -529,11 +531,11 @@ struct BenchSection: View {
 
     return VStack(alignment: .leading, spacing: 6) {
       Text(title)
-        .font(.caption2.weight(.semibold))
+        .font(f(.caption2, .semibold))
         .foregroundStyle(.secondary)
       if present.isEmpty || maxMagnitude == 0 {
         Text("no data")
-          .font(.caption2)
+          .font(f(.caption2))
           .foregroundStyle(.tertiary)
       } else {
         ForEach(values, id: \.0) { model, v in
@@ -547,10 +549,10 @@ struct BenchSection: View {
                 .fill(color)
                 .frame(width: 6, height: 6)
               Text(ModelCatalog.displayName(for: model))
-                .font(.system(size: 11))
+                .font(f(size: 11))
                 .lineLimit(1)
             }
-            .frame(width: 175, alignment: .leading)
+            .frame(width: 175 * uiScale, alignment: .leading)
 
             GeometryReader { geo in
               RoundedRectangle(cornerRadius: 3)
@@ -561,13 +563,13 @@ struct BenchSection: View {
 
             HStack(spacing: 4) {
               Text(v.map { String(format: "%.1f", $0) + unit } ?? "—")
-                .font(.system(size: 11, design: .monospaced))
+                .font(f(size: 11, design: .monospaced))
                 .fontWeight(isBest ? .bold : .regular)
                 .foregroundStyle(isBest ? Color.green : Color.primary)
                 .lineLimit(1)
               if isBest && present.count > 1 {
                 Text("BEST")
-                  .font(.system(size: 8, weight: .bold))
+                  .font(f(size: 8, weight: .bold))
                   .foregroundStyle(.green)
                   .lineLimit(1)
                   .padding(.horizontal, 3.5)
@@ -576,7 +578,7 @@ struct BenchSection: View {
               }
             }
             .fixedSize(horizontal: true, vertical: false)
-            .frame(width: 108, alignment: .trailing)
+            .frame(width: 108 * uiScale, alignment: .trailing)
           }
         }
       }
@@ -591,7 +593,7 @@ struct BenchSection: View {
       // flight rather than a stored one.
       HStack {
         Text("SCENARIO BREAKDOWN")
-          .font(.caption2.weight(.bold))
+          .font(f(.caption2, .bold))
           .foregroundStyle(.secondary)
           .lineLimit(1)
         Spacer(minLength: 12)
@@ -599,7 +601,7 @@ struct BenchSection: View {
           bench.deleteCurrentRun()
         } label: {
           Label("Clear", systemImage: "trash")
-            .font(.caption2)
+            .font(f(.caption2))
             .lineLimit(1)
         }
         .buttonStyle(.borderless)
@@ -637,7 +639,7 @@ struct BenchSection: View {
         Text("RUNNING (\(done)/\(bench.scenarioCount))")
           .lineLimit(1)
       }
-      .font(.system(size: 9, weight: .bold))
+      .font(f(size: 9, weight: .bold))
       .foregroundStyle(.blue)
       .padding(.horizontal, 5)
       .padding(.vertical, 1.5)
@@ -652,7 +654,7 @@ struct BenchSection: View {
 
   private func pill(_ text: String, _ color: Color) -> some View {
     Text(text)
-      .font(.system(size: 9, weight: .bold))
+      .font(f(size: 9, weight: .bold))
       .foregroundStyle(color)
       .lineLimit(1)
       .padding(.horizontal, 5)
@@ -681,42 +683,42 @@ struct BenchSection: View {
           .fill(color)
           .frame(width: 8, height: 8)
         Text(ModelCatalog.displayName(for: model))
-          .font(.subheadline.weight(.semibold))
+          .font(f(.subheadline, .semibold))
         statusBadge(for: model)
         if let ane = bench.aneStates[model] {
           Text("ANE \(ane)")
-            .font(.caption2)
+            .font(f(.caption2))
             .foregroundStyle(.tertiary)
         }
         if let mean {
           Text(String(format: "mean %.1f tok/s", mean))
-            .font(.caption.weight(.medium))
+            .font(f(.caption, .medium))
             .foregroundStyle(.primary)
         }
         if let avgMem, let peakMem {
           Text(String(format: "· mem avg %.1fG (peak %.1fG)", avgMem, peakMem))
-            .font(.caption)
+            .font(f(.caption))
             .foregroundStyle(.secondary)
         }
         if let total {
           Text(String(format: "· total %.1fs", total))
-            .font(.caption)
+            .font(f(.caption))
             .foregroundStyle(.secondary)
         }
         if let load = rows.first?.loadSeconds {
           Text(String(format: "· load %.1fs", load))
-            .font(.caption)
+            .font(f(.caption))
             .foregroundStyle(.tertiary)
         }
         if let o = rows.first?.order, o == bench.plan.count - 1 {
           Text("(ran last, hottest)")
-            .font(.caption2)
+            .font(f(.caption2))
             .foregroundStyle(.tertiary)
         }
       }
       if runStatus(for: model) == .queued {
         Text("Waiting for the previous model to finish and unload from memory.")
-          .font(.caption)
+          .font(f(.caption))
           .foregroundStyle(.tertiary)
           .padding(.vertical, 8)
           .frame(maxWidth: .infinity, alignment: .leading)
@@ -757,7 +759,7 @@ struct BenchSection: View {
         cell("TIME", width: 46, dim: true)
         cell("", width: 40, dim: true)
       }
-      .font(.system(size: 9, weight: .bold))
+      .font(f(size: 9, weight: .bold))
       .foregroundStyle(.tertiary)
 
       ForEach(rows) { r in
@@ -784,7 +786,7 @@ struct BenchSection: View {
             }
           } label: {
             Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
-              .font(.system(size: 9, weight: .bold))
+              .font(f(size: 9, weight: .bold))
               .foregroundStyle(isExpanded ? Color.accentColor : Color.secondary)
               .frame(width: 24, height: 18)
               .background(
@@ -797,11 +799,11 @@ struct BenchSection: View {
             isExpanded
               ? "Hide prompt & response preview" : "Inspect prompt & response for \(r.promptID)")
         }
-        .font(.caption2)
+        .font(f(.caption2))
         if let msg = r.metrics.error ?? r.metrics.skipped {
           HStack(spacing: 0) {
             cell(msg, width: 624, align: .leading, dim: true)
-          }.font(.caption2)
+          }.font(f(.caption2))
         }
       }
     }
@@ -829,13 +831,13 @@ struct BenchSection: View {
   private func previewHeader(model: String, result: BenchResult) -> some View {
     HStack(spacing: 8) {
       Image(systemName: "text.magnifyingglass")
-        .font(.caption.weight(.semibold))
+        .font(f(.caption, .semibold))
         .foregroundStyle(.secondary)
       Text("SCENARIO PREVIEW · \(result.promptID)")
-        .font(.caption.weight(.bold))
+        .font(f(.caption, .bold))
         .foregroundStyle(.primary)
       Text("(\(result.effort) effort)")
-        .font(.caption2)
+        .font(f(.caption2))
         .foregroundStyle(.secondary)
       Spacer()
       Button {
@@ -844,7 +846,7 @@ struct BenchSection: View {
         }
       } label: {
         Image(systemName: "xmark.circle.fill")
-          .font(.caption)
+          .font(f(.caption))
           .foregroundStyle(.secondary)
       }
       .buttonStyle(.plain)
@@ -882,7 +884,7 @@ struct BenchSection: View {
     VStack(alignment: .leading, spacing: 3) {
       HStack {
         Text("PROMPT (\(prompt.count) chars)")
-          .font(.system(size: 9, weight: .bold))
+          .font(f(size: 9, weight: .bold))
           .foregroundStyle(.secondary)
         Spacer()
         Button {
@@ -890,12 +892,12 @@ struct BenchSection: View {
           NSPasteboard.general.setString(prompt, forType: .string)
         } label: {
           Label("Copy", systemImage: "doc.on.doc")
-            .font(.system(size: 10))
+            .font(f(size: 10))
         }
         .buttonStyle(.link)
       }
       Text(prompt.count > 3_000 ? String(prompt.prefix(3_000)) + " … [truncated preview]" : prompt)
-        .font(.system(size: 11, design: .monospaced))
+        .font(f(size: 11, design: .monospaced))
         .foregroundStyle(.primary)
         .textSelection(.enabled)
         .padding(8)
@@ -908,11 +910,11 @@ struct BenchSection: View {
     VStack(alignment: .leading, spacing: 3) {
       HStack {
         Text("MODEL OUTPUT")
-          .font(.system(size: 9, weight: .bold))
+          .font(f(size: 9, weight: .bold))
           .foregroundStyle(.secondary)
         if let think = result.metrics.reasoningTokens, think > 0 {
           Text("(\(think) reasoning tokens)")
-            .font(.system(size: 9))
+            .font(f(size: 9))
             .foregroundStyle(.secondary)
         }
         Spacer()
@@ -922,7 +924,7 @@ struct BenchSection: View {
             NSPasteboard.general.setString(out, forType: .string)
           } label: {
             Label("Copy", systemImage: "doc.on.doc")
-              .font(.system(size: 10))
+              .font(f(size: 10))
           }
           .buttonStyle(.link)
         }
@@ -933,7 +935,7 @@ struct BenchSection: View {
         ?? result.metrics.skipped
         ?? "(no output recorded)"
       Text(textToDisplay)
-        .font(.system(size: 11, design: .monospaced))
+        .font(f(size: 11, design: .monospaced))
         .foregroundStyle(.primary)
         .textSelection(.enabled)
         .fixedSize(horizontal: false, vertical: true)
@@ -946,10 +948,10 @@ struct BenchSection: View {
   private func metricBadge(title: String, value: String, color: Color) -> some View {
     HStack(spacing: 3) {
       Text(title)
-        .font(.system(size: 8, weight: .bold))
+        .font(f(size: 8, weight: .bold))
         .foregroundStyle(.secondary)
       Text(value)
-        .font(.system(size: 9, weight: .semibold, design: .monospaced))
+        .font(f(size: 9, weight: .semibold, design: .monospaced))
         .foregroundStyle(color)
     }
     .padding(.horizontal, 6)
@@ -964,12 +966,12 @@ struct BenchSection: View {
       EmptyView()
     case .loading(let m, let i, let n):
       Text("Loading \(i)/\(n) · \(ModelCatalog.displayName(for: m))…")
-        .font(.caption).foregroundStyle(.secondary)
+        .font(f(.caption)).foregroundStyle(.secondary)
     case .running(let m, let p):
       Text("\(ModelCatalog.displayName(for: m)) · Scenario: \(p)…")
-        .font(.caption).foregroundStyle(.secondary)
+        .font(f(.caption)).foregroundStyle(.secondary)
     case .done:
-      Text("Completed").font(.caption).foregroundStyle(.green)
+      Text("Completed").font(f(.caption)).foregroundStyle(.green)
     case .failed(let m):
       note(m, .red)
     }
@@ -998,14 +1000,14 @@ struct BenchSection: View {
     dim: Bool = false
   ) -> some View {
     Text(t)
-      .font(.system(size: 10, design: .monospaced))
+      .font(f(size: 10, design: .monospaced))
       .foregroundStyle(dim ? Color.secondary : Color.primary)
       .frame(width: width, alignment: align)
       .lineLimit(1)
   }
 
   private func note(_ m: String, _ c: Color) -> some View {
-    Text(m).font(.caption).foregroundStyle(c).fixedSize(horizontal: false, vertical: true)
+    Text(m).font(f(.caption)).foregroundStyle(c).fixedSize(horizontal: false, vertical: true)
   }
 
   private func imageLabel(_ path: String) -> String {

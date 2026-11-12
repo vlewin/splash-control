@@ -20,6 +20,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
   private let navigation = DashboardNavigation()
   private var dashboardWindow: NSWindow?
+  /// Last zoom step applied to the open window's size, so the config sink
+  /// re-fits only when the step actually changed (and can scale the current
+  /// height by the step ratio).
+  private var lastAppliedScale = 1.0
+  /// Local key monitor for Cmd +/− (see `installZoomKeyShortcuts`).
+  private var zoomKeyMonitor: Any?
   private var pollTask: Task<Void, Never>?
   private var lastHealthy: Bool?
   private var lastReady: Bool?
@@ -70,6 +76,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
       requestQuit: { [weak self] in self?.quit() }
     )
 
+    installZoomKeyShortcuts()
+
     lastModel = config.config.model
     config.$config
       .receive(on: RunLoop.main)
@@ -102,6 +110,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
           }
         }
         self.applyLoginItem(cfg.startOnLogin)
+        self.applyDashboardZoom(cfg.dashboardScaleFactor)
         self.restartPolling()
       }
       .store(in: &cancellables)
@@ -112,12 +121,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // menu opens. Skipped harmlessly when the directory does not exist yet —
     // the catalog keeps a short TTL fallback.
     ModelCatalog.startWatching()
-
-    // TEMP(verification): unbundle dev binary has no status menu bar;
-    // env hook lets a test launch open the dashboard directly. Remove after use.
-    if ProcessInfo.processInfo.environment["SPLASH_CONTROL_TEST_OPEN_DASHBOARD"] != nil {
-      showDashboard()
-    }
 
     if config.config.autoStart {
       process.start()
@@ -304,18 +307,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   /// only the bottom edge moves and the segmented control never jumps.
   ///
   /// Called once from `showDashboard` (unanimated, so the window opens at the
-  /// right height rather than visibly growing into it) and then from
+  /// right tab's height rather than visibly growing into it) and then from
   /// `DashboardView` on every tab switch.
   ///
   /// Only Logs still resolves through this table. Every other tab reports
   /// its measured content height (see ContentHeightKey) and lands in
   /// `resizeDashboardToContent`; the entries below are its opening
   /// fallback until the first report arrives, a frame later.
+  ///
   func resizeDashboard(forTab tab: Int, animate: Bool = true) {
     guard let window = dashboardWindow,
       let visible = (window.screen ?? NSScreen.main)?.visibleFrame
     else { return }
-    let height = min(Self.tabHeights[tab] ?? 740, visible.height - 16)
+    // The table is the 100 % opening height, and the zoom step multiplies it:
+    // the same ratio measured in pt grows with the typography, and the entry
+    // is only a fallback until the tab's own content report arrives.
+    let s = CGFloat(config.config.dashboardScaleFactor)
+    let height = min((Self.tabHeights[tab] ?? 740) * s, visible.height - 16)
     applyDashboardHeight(height, animate: animate)
   }
 
@@ -328,7 +336,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   /// AppKit would clamp to `contentMinSize` anyway. No tab ScrollView may
   /// declare its own taller minHeight — a 560 floor under a shorter report
   /// compressed the ScrollView until content slid under the toolbar.
-  /// Ceiling is the screen.
+  ///
+  ///
+  /// The zoom step scales typography *inside* the content, so reports
+  /// already carry it — no step multiplication here. The floor is the fixed
+  /// view-level 380 pt plus chrome; ceiling is the screen.
   func resizeDashboardToContent(_ contentHeight: CGFloat, animate: Bool = true) {
     guard let window = dashboardWindow,
       let contentView = window.contentView,
@@ -377,7 +389,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
       window.center()
       return
     }
-    let width: CGFloat = 880
+    // The zoom step scales typography inside the content; the window width
+    // follows it so the layout keeps its 100 % proportions and grown rows
+    // never run past the edge. Height needs no step: tabs report their own
+    // (already scaled) content height.
+    let width: CGFloat = 880 * CGFloat(config.config.dashboardScaleFactor)
     let height = min(visible.height - 40, 1100)
     window.setContentSize(NSSize(width: width, height: height))
     // Top-inside the visible frame, not `visible.minY + 20`: that put the
@@ -427,6 +443,74 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
   private func showSettings() {
     showDashboard(tab: 4)
+  }
+
+  /// Cmd +/- step the dashboard zoom, matching the editor convention. The
+  /// tray is an accessory app without a main menu, so menu key equivalents
+  /// only fire while a menu is open - a local event monitor is the path that
+  /// works while the dashboard itself has focus. Cmd+= / Cmd++ step up,
+  /// Cmd+- steps down, clamped at the ends of the closed step set. The
+  /// accepted characters follow the *layout*: US sends the unshifted glyph
+  /// ("=" for Cmd+Shift+=), a German layout sends the literal "+" (its +
+  /// needs no shift) and "-" likewise.
+  private func installZoomKeyShortcuts() {
+    zoomKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+      // `contains` + exclusions, not `== [.command]`: AppKit ORs a device
+      // side-bit (which Command key) into `deviceIndependentFlagsMask`, so
+      // equality against [.command] rejects every real Cmd keystroke. Shift
+      // stays allowed: the physical Cmd++ arrives as shift+Cmd+"=" on US.
+      let mods = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+      let key = event.charactersIgnoringModifiers
+      guard mods.contains(.command), !mods.contains(.control), !mods.contains(.option),
+        key == "=" || key == "+" || key == "-"
+      else { return event }
+      let steps = SplashConfig.dashboardScaleValues
+      guard let i = steps.firstIndex(of: self.config.config.dashboardScale) else { return event }
+      let dir = (key == "=" || key == "+") ? 1 : -1
+      let next = min(max(i + dir, 0), steps.count - 1)
+      guard steps[next] != self.config.config.dashboardScale else { return event }
+      self.config.config.dashboardScale = steps[next]
+      return nil
+    }
+  }
+
+  /// Apply a new zoom step to the open dashboard (Tray ▸ Zoom through the
+  /// config sink). The step lives in the SwiftUI environment, so the content
+  /// re-renders at the new text size on its own and reports a new height a
+  /// frame later (`ContentHeightKey`) — the window follows through the normal
+  /// content-fit path. What cannot re-render itself is the window *width*:
+  /// the layout keeps its 100 % proportions only if the frame grows with the
+  /// step, so it is set here. Top-left stays pinned, so the toolbar never
+  /// jumps; the frame is clamped into the visible display.
+  private func applyDashboardZoom(_ scale: Double) {
+    let s = CGFloat(scale)
+    guard abs(s - lastAppliedScale) > 0.001 else { return }
+    lastAppliedScale = s
+    guard let window = dashboardWindow,
+      let visible = (window.screen ?? NSScreen.main)?.visibleFrame
+    else { return }
+    let width = min(880 * s, visible.width - 16)
+    SplashLog.shared.log(
+      "zoom s=\(s) -> width=\(Int(width)) (was \(Int(window.frame.width)))")
+    var frame = window.frame
+    frame.size.width = width
+    frame.origin.x = min(frame.origin.x, visible.maxX - width - 8)
+    frame.origin.x = max(frame.origin.x, visible.minX + 8)
+    window.setFrame(frame, display: true)
+    // Logs is the only tab that reports no measured height: its frame comes
+    // from the `tabHeights` table times the step, applied on tab switches.
+    // A zoom change re-renders its rows but refits nothing, so the window
+    // would keep the *old* step's height under the new content. Re-apply the
+    // tab's height here, same top-pinned path - but never animated: a held
+    // Cmd++ lands several steps per second, and overlapping `animator()`
+    // transitions leave the window's live-resize drawing pass stuck on the
+    // previous step's raster (the filter row and search field kept drawing
+    // at 100 % under a 200 % frame until a click dirtied the view). A zoom
+    // step is discrete anyway - the width jump is already instant.
+    if navigation.selectedTab == 3 {
+      resizeDashboard(forTab: 3, animate: false)
+    }
+    window.displayIfNeeded()
   }
 
   private func showInfo() {

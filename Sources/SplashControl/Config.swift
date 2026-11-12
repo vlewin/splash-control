@@ -77,6 +77,9 @@ struct SplashConfig: Codable, Equatable {
   var splashPath: String? = nil
   /// Show current decode tok/s as text next to the menu bar icon
   var showTrayTps: Bool = true
+  /// Dashboard zoom in percent (`SplashConfig.dashboardScaleValues`); the tray's
+  /// Zoom submenu sets it, the dashboard scales its typography and icons to it.
+  var dashboardScale: Int = 100
   /// Launch the server when the app starts
   var autoStart: Bool = false
   /// Stop a launched server when the app quits (Yes/No confirmed); false = leave it running
@@ -97,6 +100,16 @@ struct SplashConfig: Codable, Equatable {
 
   /// Closed value set for `--verify-rows`, from `serve --help`.
   static let verifyRowsValues = ["auto", "all"]
+
+  /// Closed value set for `dashboardScale`, in percent. Ordered for the menu.
+  static let dashboardScaleValues = [100, 125, 150, 175, 200]
+
+  /// The factor `dashboardScale` stands for. A stored value outside the
+  /// closed set (a hand-edited file, a future set change) reads as 1.0; the
+  /// ConfigStore migration rewrites it to the nearest legal step.
+  var dashboardScaleFactor: Double {
+    Self.dashboardScaleValues.contains(dashboardScale) ? Double(dashboardScale) / 100 : 1
+  }
 
   /// The context windows a picker can offer. The base rows always exist;
   /// 256K is the server's native cap, so it and the YaRN-stretched rows above
@@ -158,7 +171,8 @@ struct SplashConfig: Codable, Equatable {
       allowedHost,
       maxRequestSize, maxImagePixels, apiKey, extraArgs, splashPath,
       servedModelName, announceServedName, reasoningEffort,
-      showTrayTps, autoStart, stopOnQuit, startOnLogin, pollIntervalSec, windowMinutes,
+      showTrayTps, dashboardScale, autoStart, stopOnQuit, startOnLogin, pollIntervalSec,
+      windowMinutes,
       persistentCache, idleRelease,
       expertMemory, pleMemory, sparseKvMemory, verifyRows
   }
@@ -201,6 +215,7 @@ struct SplashConfig: Codable, Equatable {
       try c.decodeIfPresent(String.self, forKey: .reasoningEffort) ?? d.reasoningEffort
     splashPath = try c.decodeIfPresent(String.self, forKey: .splashPath) ?? d.splashPath
     showTrayTps = try c.decodeIfPresent(Bool.self, forKey: .showTrayTps) ?? d.showTrayTps
+    dashboardScale = try c.decodeIfPresent(Int.self, forKey: .dashboardScale) ?? d.dashboardScale
     autoStart = try c.decodeIfPresent(Bool.self, forKey: .autoStart) ?? d.autoStart
     stopOnQuit = try c.decodeIfPresent(Bool.self, forKey: .stopOnQuit) ?? d.stopOnQuit
     startOnLogin = try c.decodeIfPresent(Bool.self, forKey: .startOnLogin) ?? d.startOnLogin
@@ -274,6 +289,14 @@ final class ConfigStore: ObservableObject {
       }
       if ![15, 30, 60].contains(config.windowMinutes) {
         config.windowMinutes = 60
+        migrated = true
+      }
+      // A zoom outside the closed set (hand-edited file, a set that changed
+      // between versions) snaps to the nearest legal step, so the menu's
+      // checkmark always lands on a row that exists.
+      if !SplashConfig.dashboardScaleValues.contains(config.dashboardScale) {
+        config.dashboardScale = SplashConfig.dashboardScaleValues.min(
+          by: { abs($0 - config.dashboardScale) < abs($1 - config.dashboardScale) })!
         migrated = true
       }
       // `--default-reasoning-effort` gained a dedicated control: lift it

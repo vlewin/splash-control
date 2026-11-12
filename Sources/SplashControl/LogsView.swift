@@ -18,6 +18,8 @@ import SwiftUI
 ///   every refresh, so reading an earlier stack trace meant being yanked back to
 ///   the newest line every two seconds.
 struct LogsView: View {
+  @Environment(\.uiScale) private var uiScale
+  private var f: ScaledFont { ScaledFont(s: uiScale) }
   /// Shown at most. Cheap now that only visible rows are laid out, so this is
   /// history rather than a render budget — a rotation generation is ~4 days
   /// at the observed request rate.
@@ -124,7 +126,7 @@ struct LogsView: View {
             ? "\(channel.filename) could not be opened — output is being discarded."
             : "No \(channel.filename) yet — it is created when the tray launches a server."
         )
-        .font(.callout)
+        .font(f(.callout))
         .foregroundStyle(SplashLog.unavailable.contains(channel) ? Color.red : Color.secondary)
         .frame(maxWidth: .infinity)
         .padding(.vertical, 28)
@@ -133,7 +135,7 @@ struct LogsView: View {
         // line, not a missing one. Saying "no log yet" here is what made
         // Rotate look like it had failed and needed a restart.
         Text("Log is empty — waiting for the next line.")
-          .font(.callout)
+          .font(f(.callout))
           .foregroundStyle(.secondary)
           .frame(maxWidth: .infinity)
           .padding(.vertical, 28)
@@ -188,7 +190,7 @@ struct LogsView: View {
         LazyVStack(alignment: .leading, spacing: 0) {
           ForEach(Array(visible.enumerated()), id: \.offset) { _, line in
             Self.row(line, needle: needle)
-              .font(.system(size: 11, design: .monospaced))
+              .font(f(size: 11, design: .monospaced))
               .foregroundStyle(Self.colour(for: line))
               .textSelection(.enabled)
               .frame(maxWidth: .infinity, alignment: .leading)
@@ -252,16 +254,16 @@ struct LogsView: View {
     VStack(alignment: .leading, spacing: 8) {
       HStack(spacing: 8) {
         Image(systemName: "magnifyingglass")
-          .font(.system(size: 11))
+          .font(f(size: 11))
           .foregroundStyle(.secondary)
         TextField("filter — e.g. error, fail, denied, 400", text: $query)
           .textFieldStyle(.plain)
-          .font(.system(size: 11, design: .monospaced))
+          .font(f(size: 11, design: .monospaced))
         if !query.isEmpty {
           Button {
             query = ""
           } label: {
-            Image(systemName: "xmark.circle.fill").font(.system(size: 11))
+            Image(systemName: "xmark.circle.fill").font(f(size: 11))
           }
           .buttonStyle(.borderless)
           .help("Clear the search")
@@ -277,6 +279,14 @@ struct LogsView: View {
       )
       HStack(spacing: 6) {
         // Sized to its labels: an equal split truncates "Warnings & Errors".
+        // No `.id(uiScale)` here: re-creating the control per step measures
+        // it while it is still off-window, where AppKit returns a stale fit
+        // (measured: every fresh 200 % control came back at the 175 % width
+        // and the row drew truncated until a click). The live control
+        // re-measures correctly at every step - `applyFontAndWidth` re-sets
+        // the labels, which drops AppKit's text-measurement cache *and*
+        // dirties the cells, so frame and drawing both follow the step
+        // without any interaction.
         FixedSegmented(
           width: nil, titles: Level.allCases.map(\.label), values: Level.allCases,
           selection: $level
@@ -293,7 +303,7 @@ struct LogsView: View {
             followTail ? "Following tail" : "Tail locked",
             systemImage: followTail ? "arrow.down.circle.fill" : "lock.fill"
           )
-          .font(.caption)
+          .font(f(.caption))
           .fixedSize()
         }
         .buttonStyle(.borderless)
@@ -309,7 +319,7 @@ struct LogsView: View {
             ? "\(lines.count) lines"
             : "\(visible.count) of \(lines.count) lines"
         )
-        .font(.caption2)
+        .font(f(.caption2))
         .foregroundStyle(.tertiary)
         .lineLimit(1)
         .fixedSize()
@@ -326,22 +336,22 @@ struct LogsView: View {
   private var footer: some View {
     HStack(spacing: 6) {
       Image(systemName: "doc.text")
-        .font(.system(size: 11))
+        .font(f(size: 11))
         .foregroundStyle(.secondary)
       Text(displayPath)
-        .font(.system(size: 11, design: .monospaced))
+        .font(f(size: 11, design: .monospaced))
         .foregroundStyle(.secondary)
         .lineLimit(1)
         .truncationMode(.middle)
         .textSelection(.enabled)
         .help(displayPath)
       Text(sizeText)
-        .font(.system(size: 11, design: .monospaced))
+        .font(f(size: 11, design: .monospaced))
         .foregroundStyle(.tertiary)
         .lineLimit(1)
         .fixedSize()
       Text("updated \(mtimeText)")
-        .font(.system(size: 11, design: .monospaced))
+        .font(f(size: 11, design: .monospaced))
         .foregroundStyle(.tertiary)
         .lineLimit(1)
         .fixedSize()
@@ -357,7 +367,7 @@ struct LogsView: View {
         }
       } label: {
         Label(copied ? "Copied" : "Copy filtered", systemImage: copied ? "checkmark" : "doc.on.doc")
-          .font(.system(size: 11))
+          .font(f(size: 11))
       }
       .buttonStyle(.borderless)
       .help("Copy the \(visible.count) lines currently shown")
@@ -365,7 +375,7 @@ struct LogsView: View {
         export()
       } label: {
         Label("Export", systemImage: "square.and.arrow.down")
-          .font(.system(size: 11))
+          .font(f(size: 11))
       }
       .buttonStyle(.borderless)
       .help("Write the filtered lines to a text file")
@@ -379,7 +389,7 @@ struct LogsView: View {
         }
       } label: {
         Image(systemName: copied ? "checkmark" : "doc.on.doc")
-          .font(.system(size: 11))
+          .font(f(size: 11))
       }
       .buttonStyle(.borderless)
       .help(copied ? "Copied" : "Copy the full log path")
@@ -390,7 +400,7 @@ struct LogsView: View {
   private var header: some View {
     VStack(alignment: .leading, spacing: 6) {
       HStack(alignment: .center, spacing: 10) {
-        Text("Logs").font(.title3.weight(.semibold))
+        Text("Logs").font(f(.title3, .semibold))
         // Channel switcher: the server stream and the tray's own lifecycle
         // log are both answers to "what happened", and forcing one of them
         // into Settings made the tray log effectively invisible.
@@ -400,18 +410,38 @@ struct LogsView: View {
         )
         .fixedSize()
         Spacer(minLength: 0)
-        Button("Rotate") { confirmingRotate = true }
-          .disabled(missing)
-          .help(
-            "Delete \(channel.filename) and start an empty one. Nothing is archived. The server is not restarted."
-          )
-        Button("Refresh") { reload() }
-        Button("Reveal in Finder") {
+        // Push buttons carry no scalable native chrome: `.bordered` is an
+        // AppKit bezel at a fixed height, so scaling only the label left the
+        // text overhanging a small-grey box at 200 %. `.zoomButton()` is the
+        // project's vector replacement (ZoomControls) - padding, radius and
+        // height follow the step from the scaled label, same as the Info
+        // buttons. `f(size: 11)` is that control's 100 % label size, so 100 %
+        // matches the previous look.
+        Button {
+          confirmingRotate = true
+        } label: {
+          Text("Rotate").font(f(size: 11))
+        }
+        .zoomButton()
+        .disabled(missing)
+        .help(
+          "Delete \(channel.filename) and start an empty one. Nothing is archived. The server is not restarted."
+        )
+        Button {
+          reload()
+        } label: {
+          Text("Refresh").font(f(size: 11))
+        }
+        .zoomButton()
+        Button {
           let u = url
           if !NSWorkspace.shared.open(u) {
             NSWorkspace.shared.activateFileViewerSelecting([u])
           }
+        } label: {
+          Text("Reveal in Finder").font(f(size: 11))
         }
+        .zoomButton()
         .disabled(missing)
       }
       .controlSize(.small)

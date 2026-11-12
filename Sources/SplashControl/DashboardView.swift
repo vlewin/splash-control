@@ -40,6 +40,8 @@ enum Stamp {
 // MARK: - Hero panels
 
 private struct HeroPanel: View {
+  @Environment(\.uiScale) private var uiScale
+  private var f: ScaledFont { ScaledFont(s: uiScale) }
   let title: String
   let value: String
   let unit: String
@@ -48,32 +50,38 @@ private struct HeroPanel: View {
   /// Optional status icon, top-right of the title row (e.g. power ⚡, pressure ⚠).
   var icon: (() -> AnyView)? = nil
 
+  /// Base 108 pt panel height, grown with the zoom step so the 40 pt value
+  /// never clips. Chrome stays system-sized; only the panel box follows text.
+  private var heroHeight: CGFloat { 108 * uiScale }
+
   var body: some View {
     VStack(alignment: .leading, spacing: 6) {
       HStack(spacing: 4) {
         Text(title.uppercased())
-          .font(.caption2.weight(.semibold))
+          .font(f(.caption2, .semibold))
           .foregroundStyle(.secondary)
         Spacer(minLength: 4)
         if let icon { icon() }
       }
       HStack(alignment: .firstTextBaseline, spacing: 4) {
         Text(value)
-          .font(.system(size: 40, weight: .bold, design: .rounded))
+          .font(f(size: 40, weight: .bold, design: .rounded))
           .monospacedDigit()
           .lineLimit(1)
           .minimumScaleFactor(0.3)
           .foregroundStyle(accent)
         Text(unit)
-          .font(.title3.weight(.medium))
+          .font(f(.title3, .medium))
           .foregroundStyle(.secondary)
       }
       Text(caption)
-        .font(.caption)
+        .font(f(.caption))
         .foregroundStyle(.tertiary)
         .lineLimit(1)
     }
-    .frame(maxWidth: .infinity, minHeight: 108, maxHeight: 108, alignment: .leading)
+    // The 40 pt hero value scales with the zoom step, so the panel height
+    // scales with it — a fixed 108 would clip the value at 175–200 %.
+    .frame(maxWidth: .infinity, minHeight: heroHeight, maxHeight: heroHeight, alignment: .leading)
     .padding()
     .background(.background.secondary, in: RoundedRectangle(cornerRadius: 12))
     .overlay(
@@ -86,6 +94,8 @@ private struct HeroPanel: View {
 // MARK: - Chart
 
 private struct SeriesChart: View {
+  @Environment(\.uiScale) private var uiScale
+  private var f: ScaledFont { ScaledFont(s: uiScale) }
   let title: String
   let unit: String
   let samples: [Sample]
@@ -302,7 +312,7 @@ private struct SeriesChart: View {
         .fontWeight(.semibold)
         .monospacedDigit()
     }
-    .font(.caption2)
+    .font(f(.caption2))
   }
 
   private func lastValue(upTo date: Date? = nil, extractor: (Sample) -> Double?) -> Double? {
@@ -318,11 +328,11 @@ private struct SeriesChart: View {
         .fill(col)
         .frame(width: 6, height: 6)
       Text(name)
-        .font(.caption2)
+        .font(f(.caption2))
         .foregroundStyle(.secondary)
       if let value {
         Text(unit == "%" ? String(format: "%.0f%%", value) : String(format: "%.1f", value))
-          .font(.caption2.weight(.semibold))
+          .font(f(.caption2, .semibold))
           .monospacedDigit()
           .foregroundStyle(.primary)
       }
@@ -361,7 +371,7 @@ private struct SeriesChart: View {
             (pv.map { unit == "%" ? String(format: "%.0f%%", $0) : String(format: "%.1f", $0) }
               ?? "—") + (scrubSuffix?(pv) ?? "")
           Text("\(primaryName) \(formatted)")
-            .font(.system(size: 10, weight: .semibold, design: .monospaced))
+            .font(f(size: 10, weight: .semibold, design: .monospaced))
         }
         ForEach(evs, id: \.0) { name, col, val in
           HStack(spacing: 3) {
@@ -370,7 +380,7 @@ private struct SeriesChart: View {
               val.map { unit == "%" ? String(format: "%.0f%%", $0) : String(format: "%.1f", $0) }
               ?? "—"
             Text("\(name) \(formatted)")
-              .font(.system(size: 10, weight: .semibold, design: .monospaced))
+              .font(f(size: 10, weight: .semibold, design: .monospaced))
           }
         }
       }
@@ -427,7 +437,7 @@ private struct SeriesChart: View {
           .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 3]))
           .annotation(position: threshold.position, alignment: threshold.alignment, spacing: 2) {
             Text(threshold.label)
-              .font(.system(size: 8, weight: .semibold, design: .monospaced))
+              .font(f(size: 8, weight: .semibold, design: .monospaced))
               .foregroundStyle(threshold.color)
               .padding(.horizontal, 4)
               .padding(.vertical, 1.5)
@@ -494,7 +504,7 @@ private struct SeriesChart: View {
           .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 3]))
           .annotation(position: .bottom, alignment: .center, spacing: 18) {
             Image(systemName: "arrowtriangle.up.fill")
-              .font(.system(size: 6))
+              .font(f(size: 6))
               .foregroundStyle(markerColor)
           }
           .annotation(
@@ -513,10 +523,10 @@ private struct SeriesChart: View {
             }()
             HStack(spacing: 2) {
               Image(systemName: icon)
-                .font(.system(size: 7, weight: .semibold))
+                .font(f(size: 7, weight: .semibold))
               if let badgeText {
                 Text(badgeText)
-                  .font(.system(size: 8, weight: .semibold, design: .monospaced))
+                  .font(f(size: 8, weight: .semibold, design: .monospaced))
                   .lineLimit(1)
               }
             }
@@ -576,7 +586,7 @@ private struct SeriesChart: View {
         Text(
           "\(title) \(unit.isEmpty ? "" : "(" + unit + ")")\(mode == .bars ? " · \(bucketName)" : "")"
         )
-        .font(.caption.weight(.semibold))
+        .font(f(.caption, .semibold))
         .foregroundStyle(.secondary)
         .lineLimit(1)
         Spacer()
@@ -604,7 +614,7 @@ private struct SeriesChart: View {
       // points, so a chart with nothing to plot is non-empty.
       if points.allSatisfy({ $0.value == nil }) {
         Text("collecting…")
-          .font(.caption)
+          .font(f(.caption))
           .foregroundStyle(.tertiary)
           .frame(maxWidth: .infinity, minHeight: 90)
       } else {
@@ -624,6 +634,8 @@ private struct SeriesChart: View {
 // MARK: - Small stat tiles
 
 private struct Tile: View {
+  @Environment(\.uiScale) private var uiScale
+  private var f: ScaledFont { ScaledFont(s: uiScale) }
   let title: String
   let value: String
   var warning: Bool = false
@@ -642,27 +654,27 @@ private struct Tile: View {
     VStack(alignment: .leading, spacing: 4) {
       HStack(spacing: 4) {
         Text(title.uppercased())
-          .font(.caption2.weight(.semibold))
+          .font(f(.caption2, .semibold))
           .foregroundStyle(.secondary)
           .lineLimit(1)
           .truncationMode(.tail)
         Spacer(minLength: 4)
         if let alert {
           Image(systemName: "exclamationmark.triangle.fill")
-            .font(.caption2)
+            .font(f(.caption2))
             .foregroundStyle(alertColor)
             .help(alert)
         }
         if let action { action() }
       }
       Text(value)
-        .font(.body.weight(.semibold))
+        .font(f(.body, .semibold))
         .monospacedDigit()
         .foregroundStyle(warning ? .orange : .primary)
         .lineLimit(1)
         .truncationMode(.tail)
       Text(caption ?? " ")
-        .font(.caption2)
+        .font(f(.caption2))
         .foregroundStyle(.tertiary)
         .lineLimit(1)
         .truncationMode(.tail)
@@ -694,6 +706,13 @@ final class DashboardNavigation: ObservableObject {
 // MARK: - Dashboard
 
 struct DashboardView: View {
+  // NOT `@Environment(\.uiScale)`: the `.environment` injection in `body`
+  // reaches child views only — this view's own environment reads always see
+  // the 1.0 default at the hosting root. The step therefore comes from the
+  // observed config directly; `config` is `@ObservedObject`, so a zoom pick
+  // re-renders this view at the new factor. Children keep the environment.
+  private var uiScale: CGFloat { CGFloat(config.config.dashboardScaleFactor) }
+  private var f: ScaledFont { ScaledFont(s: uiScale) }
   /// Tag the dashboard opens on. Named because `AppDelegate.showDashboard`
   /// sizes the window from it: the window has to be at the right height before
   /// the view's `onAppear` could report anything, and by then the view has
@@ -751,6 +770,12 @@ struct DashboardView: View {
     // 380, not 560: the window no longer stays at full screen height, so the
     // floor only has to clear the shortest tab (`AppDelegate.tabHeights`).
     // Below this the hosting controller would refuse to shrink further.
+    // Weg B: the tray Zoom step scales typography and icons only. Injected
+    // here (not per tab) so every child `ScaledFont` reads the same step,
+    // and the window geometry, grids and native chrome stay exactly as at
+    // 100 %. `config` is an @ObservedObject, so a zoom pick re-renders the
+    // whole tree at the new size — re-rasterised text, sharp at every step.
+    .environment(\.uiScale, CGFloat(config.config.dashboardScaleFactor))
     .frame(minWidth: 760, minHeight: 380)
     // Per-tab height. Logs keeps its fixed table height; every other tab
     // applies its measured content height (ContentHeightKey), which
@@ -778,6 +803,9 @@ struct DashboardView: View {
       }
       resizeToContent(report.height)
     }
+    // (was: .toolbar(.visible, for: .windowToolbar) — AppKit then forces the
+    // titlebar-title "Splash" into the bar and lays the principal item out
+    // right of it: the pill sat ~90 pt right of center at 100 % width.)
     .toolbar {
       ToolbarItem(placement: .principal) {
         // 530, not 440: six segments at the old width gave "Statistics"
@@ -785,9 +813,24 @@ struct DashboardView: View {
         // the one that would have truncated.
         FixedSegmented(
           width: 530, titles: ["Live", "Metrics", "Statistics", "Logs", "Settings", "Info"],
-          values: [0, 1, 2, 3, 4, 5], selection: $navigation.selectedTab
+          values: [0, 1, 2, 3, 4, 5], selection: $navigation.selectedTab,
+          scale: uiScale
         )
+        // The pill rides the zoom step like every other control. `scale:` is
+        // passed explicitly rather than left to `.environment(\\.uiScale)`:
+        // a ToolbarItem's environment does not reliably reach the
+        // representable's own environment reads - that partial leak once let
+        // the font grow without the width and truncated "Statistics". With
+        // the step explicit, font and pinned width always scale together,
+        // and the window grows with the pill (530·step fits inside 880·step).
+        // `.id`: the toolbar caches the principal item's fitting size. An
+        // in-place width change re-measures the NSView but not the toolbar
+        // slot - stepping down left the pill holding the previous step's
+        // width until a click dirtied the bar. Re-creating on a step change
+        // runs makeNSView at the new font and forces a toolbar re-measure,
+        // same as the level filter. Selection lives in `navigation`.
         .fixedSize()
+        .id(uiScale)
       }
     }
   }
@@ -837,15 +880,19 @@ struct DashboardView: View {
         if case .running = process.state { process.stop() } else { process.start() }
       } label: {
         Label(isRunning ? "Stop" : "Start", systemImage: isRunning ? "stop.fill" : "play.fill")
+          .font(f(size: 11))
       }
+      .zoomButton()
       .disabled(process.isBusy)
       Button {
         confirmRestart = true
       } label: {
         Label("Restart", systemImage: "arrow.clockwise")
+          .font(f(size: 11))
       }
+      .zoomButton()
       .disabled(process.isBusy)
-      Divider().frame(height: 18)
+      Divider().frame(height: 18 * uiScale)
       Button {
         copy("endpoint", process.endpointURL)
       } label: {
@@ -853,16 +900,21 @@ struct DashboardView: View {
           copiedWhat == "endpoint" ? "Copied" : process.endpointURL,
           systemImage: copiedWhat == "endpoint" ? "checkmark" : "link"
         )
+        .font(f(size: 11))
         .lineLimit(1)
       }
+      .zoomButton()
       .help("Copy the OpenAI-compatible base URL")
       Button {
         copy("curl", process.curlSnippet(serving: stats.latest?.instance?.model))
       } label: {
         Label(
           copiedWhat == "curl" ? "Copied" : "curl",
-          systemImage: copiedWhat == "curl" ? "checkmark" : "terminal")
+          systemImage: copiedWhat == "curl" ? "checkmark" : "terminal"
+        )
+        .font(f(size: 11))
       }
+      .zoomButton()
       .help("Copy a runnable chat-completion request")
       Button {
         if let url = URL(string: "http://127.0.0.1:\(config.config.port)/") {
@@ -870,10 +922,12 @@ struct DashboardView: View {
         }
       } label: {
         Label("WebUI", systemImage: "safari")
+          .font(f(size: 11))
       }
+      .zoomButton()
       .disabled(!stats.webUIAvailable)
       .help("Open the server's own web interface")
-      Divider().frame(height: 18)
+      Divider().frame(height: 18 * uiScale)
       Button {
         purgeMemory()
       } label: {
@@ -881,12 +935,18 @@ struct DashboardView: View {
           stats.weightsReleased ? "Purged" : (isPurging ? "Purging…" : "Free Memory"),
           systemImage: stats.weightsReleased ? "checkmark" : "arrow.down.to.line.compact"
         )
+        .font(f(size: 11))
       }
+      .zoomButton()
       .disabled(!isRunning || stats.weightsReleased || isPurging)
       .help("Immediately unwire model weights from RAM while preserving prefix cache")
       Spacer()
     }
-    .controlSize(.small)
+    // Vector chrome on the action buttons (set per button, not on the
+    // stack — the confirmationDialog below must keep its native style):
+    // the bordered bezel AppKit draws is fixed at three system sizes, so it
+    // stays stubby next to step-scaled labels. ZoomButtonStyle draws the
+    // same shapes in SwiftUI, so they follow the step and stay vector-sharp.
     .confirmationDialog("Hard restart the server?", isPresented: $confirmRestart) {
       Button("Restart") {
         Task { await process.hardRestart(serving: stats.latest?.instance?.model) }
@@ -955,7 +1015,7 @@ struct DashboardView: View {
         Text(
           "Polling 127.0.0.1:\(String(config.config.port))/status every \(Int(config.config.pollIntervalSec)) s \u{b7} tok/s = sustained \u{b7} batch peak swings with draft acceptance \u{b7} percentiles = engine rolling window"
         )
-        .font(.caption2)
+        .font(f(.caption2))
         .foregroundStyle(.tertiary)
         .frame(maxWidth: .infinity, alignment: .leading)
       }
@@ -980,17 +1040,17 @@ struct DashboardView: View {
           Text(
             "Drag horizontally on any chart to inspect synchronized values across all four series"
           )
-          .font(.caption2)
+          .font(f(.caption2))
           .foregroundStyle(.tertiary)
 
           if let d = hoverDate {
             Spacer()
             Text("Scrubbing \(Stamp.clock.string(from: d))")
-              .font(.caption2.monospaced())
+              .font(f(.caption2, nil).monospaced())
               .foregroundStyle(.secondary)
             Button("Clear") { hoverDate = nil }
               .buttonStyle(.link)
-              .font(.caption2)
+              .font(f(.caption2))
           }
         }
         .padding(.top, 4)
@@ -1008,19 +1068,19 @@ struct DashboardView: View {
       VStack(alignment: .leading, spacing: 2) {
         HStack(spacing: 8) {
           Text("Metrics")
-            .font(.title3.weight(.semibold))
+            .font(f(.title3, .semibold))
           statusChip
           powerChip
           thermalChip
         }
         Text("Rolling engine time series \u{b7} \(ModelCatalog.displayName(for: model))")
-          .font(.caption)
+          .font(f(.caption))
           .foregroundStyle(.secondary)
       }
       Spacer()
       HStack(spacing: 8) {
         Text("Window:")
-          .font(.subheadline.weight(.medium))
+          .font(f(.subheadline, .medium))
           .foregroundStyle(.secondary)
         FixedSegmented(
           width: 210, titles: ["15 min", "30 min", "1 h"], values: [15, 30, 60],
@@ -1210,7 +1270,7 @@ struct DashboardView: View {
       }
     } label: {
       Text(labelText)
-        .font(.title3.weight(.semibold))
+        .font(f(.title3, .semibold))
         .foregroundStyle(.primary)
     }
     .menuStyle(.borderlessButton)
@@ -1225,7 +1285,7 @@ struct DashboardView: View {
       copy("model", currentId)
     } label: {
       Image(systemName: isCopied ? "checkmark" : "doc.on.doc")
-        .font(.caption)
+        .font(f(.caption))
         .foregroundStyle(isCopied ? .green : .secondary)
         .frame(width: 18, height: 18)
         .contentShape(Rectangle())
@@ -1256,7 +1316,7 @@ struct DashboardView: View {
         Spacer()
         if case .running(let external) = process.state {
           Text(external ? "Running (external)" : "Running")
-            .font(.caption)
+            .font(f(.caption))
             .foregroundStyle(.secondary)
         }
       }
@@ -1270,15 +1330,15 @@ struct DashboardView: View {
       {
         HStack(spacing: 6) {
           Image(systemName: "exclamationmark.triangle.fill")
-            .font(.caption2)
+            .font(f(.caption2))
           Text(
             "Tray will start \((config.config.model as NSString).lastPathComponent), not \((other as NSString).lastPathComponent)"
           )
-          .font(.caption)
+          .font(f(.caption))
         }
         .foregroundStyle(.orange)
-        .padding(.horizontal, 8)
-        .padding(.vertical, 3)
+        .padding(.horizontal, 8 * uiScale)
+        .padding(.vertical, 3 * uiScale)
         .background(Color.orange.opacity(0.1), in: RoundedRectangle(cornerRadius: 6))
         .help(
           "The configured model and the serving model differ. A tray-started server will replace the running one."
@@ -1326,9 +1386,12 @@ struct DashboardView: View {
 
   private func chip(_ text: String, _ color: Color) -> some View {
     Text(text)
-      .font(.caption.weight(.medium))
-      .padding(.horizontal, 8)
-      .padding(.vertical, 3)
+      .font(f(.caption, .medium))
+      // Padding rides the step: a fixed 8×3 pill around a 2× caption reads
+      // as a shrunken badge next to it. The Capsule itself is a SwiftUI
+      // shape, so it draws sharp at every step.
+      .padding(.horizontal, 8 * uiScale)
+      .padding(.vertical, 3 * uiScale)
       .background(color.opacity(0.15), in: Capsule())
       .foregroundStyle(color)
   }
@@ -1349,9 +1412,9 @@ struct DashboardView: View {
   private var powerChip: some View {
     let color = powerColor
     return Text("⏻ \(PowerMode.name(stats.powerMode))")
-      .font(.caption.weight(.medium))
-      .padding(.horizontal, 8)
-      .padding(.vertical, 3)
+      .font(f(.caption, .medium))
+      .padding(.horizontal, 8 * uiScale)
+      .padding(.vertical, 3 * uiScale)
       .background(color.opacity(0.15), in: Capsule())
       .foregroundStyle(color)
   }
@@ -1373,12 +1436,12 @@ struct DashboardView: View {
       if isElevated {
         HStack(spacing: 4) {
           Image(systemName: icon)
-            .font(.system(size: 9))
+            .font(f(size: 9))
           Text(thermal.capitalized)
-            .font(.caption.weight(.medium))
+            .font(f(.caption, .medium))
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 3)
+        .padding(.horizontal, 8 * uiScale)
+        .padding(.vertical, 3 * uiScale)
         .background(color.opacity(0.15), in: Capsule())
         .foregroundStyle(color)
         .help("Thermal state: \(thermal.capitalized). GPU/CPU throttling may occur.")
@@ -1477,7 +1540,7 @@ struct DashboardView: View {
       icon = {
         AnyView(
           Image(systemName: "exclamationmark.triangle.fill")
-            .font(.caption)
+            .font(f(.caption))
             .foregroundStyle(pm == "critical" ? Color.red : Color.orange)
             .help(
               pm == "critical"
@@ -1555,7 +1618,7 @@ struct DashboardView: View {
                 confirmSSDCacheReset = true
               } label: {
                 Image(systemName: "arrow.counterclockwise")
-                  .font(.caption2)
+                  .font(f(.caption2))
               }
               .buttonStyle(.plain)
               .disabled(process.isBusy)
@@ -1711,7 +1774,7 @@ struct DashboardView: View {
   private func tileGroup(_ title: String, @ViewBuilder _ tiles: () -> some View) -> some View {
     VStack(alignment: .leading, spacing: 8) {
       Text(title.uppercased())
-        .font(.caption2.weight(.bold))
+        .font(f(.caption2, .bold))
         .foregroundStyle(.secondary)
       VStack(spacing: 8) { tiles() }
     }

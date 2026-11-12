@@ -56,7 +56,7 @@ lint_check "Context: centre group has fixedSize()" \
 lint_check "ANE: label has lineLimit(1)" \
     "grep -A 4 'Text(\"ANE:\")' '$BENCH' | grep -q 'lineLimit(1)'"
 lint_check "ANE: picker has a pinned width" \
-    "grep -A 15 'Text(\"ANE:\")' '$BENCH' | grep -q 'frame(width: 100)'"
+    "grep -A 15 'Text(\"ANE:\")' '$BENCH' | grep -q 'frame(width: 100 \* uiScale)'"
 
 # 2. Bar-chart values and the [BEST] badge. 82 pt could not hold "10.7 GiB" plus
 #    the badge and wrapped it into two lines.
@@ -2257,10 +2257,12 @@ swiftc -O -o "$work/check" \
   "$work/kit.o" \
   Sources/SplashControl/PowerMode.swift \
   Sources/SplashControl/Config.swift \
+  Sources/SplashControl/ScaledFonts.swift \
   Sources/SplashControl/ModelCatalog.swift \
   Sources/SplashControl/ModelStats.swift \
   Sources/SplashControl/LogsView.swift \
   Sources/SplashControl/ContentHeight.swift \
+  Sources/SplashControl/ZoomControls.swift \
   Sources/SplashControl/FixedSegmented.swift \
   Sources/SplashControl/SettingsView.swift \
   Sources/SplashControl/HardwareTelemetry.swift \
