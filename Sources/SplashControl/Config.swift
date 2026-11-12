@@ -49,6 +49,10 @@ struct SplashConfig: Codable, Equatable {
   /// Keep the prefill FFN on the GPU (`splash serve --disable-ane`).
   /// splash 1.3.0+ only; omitted entirely on an older binary.
   var disableAne: Bool = false
+  /// Let the Mac sleep while requests are running (`splash serve
+  /// --allow-idle-sleep`). splash 1.4.0+ only; omitted on an older binary.
+  /// Off is the server default: the machine stays awake until the requests end.
+  var allowIdleSleep: Bool = false
   /// Space-separated, maps to repeatable --allowed-host
   var allowedHost: String? = nil
   /// e.g. "128M" — --max-request-size; nil = server default
@@ -167,7 +171,7 @@ struct SplashConfig: Codable, Equatable {
   private enum CodingKeys: String, CodingKey {
     case model, port, maxMemory, maxContext, kvFormat, stateFormat, maxCacheDisk, noWebUI,
       languageOnly,
-      disableAne,
+      disableAne, allowIdleSleep,
       allowedHost,
       maxRequestSize, maxImagePixels, apiKey, extraArgs, splashPath,
       servedModelName, announceServedName, reasoningEffort,
@@ -202,6 +206,7 @@ struct SplashConfig: Codable, Equatable {
     noWebUI = try c.decodeIfPresent(Bool.self, forKey: .noWebUI) ?? d.noWebUI
     languageOnly = try c.decodeIfPresent(Bool.self, forKey: .languageOnly) ?? d.languageOnly
     disableAne = try c.decodeIfPresent(Bool.self, forKey: .disableAne) ?? d.disableAne
+    allowIdleSleep = try c.decodeIfPresent(Bool.self, forKey: .allowIdleSleep) ?? d.allowIdleSleep
     allowedHost = try c.decodeIfPresent(String.self, forKey: .allowedHost) ?? d.allowedHost
     maxRequestSize = try c.decodeIfPresent(String.self, forKey: .maxRequestSize) ?? d.maxRequestSize
     maxImagePixels = try c.decodeIfPresent(String.self, forKey: .maxImagePixels) ?? d.maxImagePixels

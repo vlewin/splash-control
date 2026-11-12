@@ -1050,6 +1050,22 @@ check("languageOnly survives a save/load round-trip",
     check("gated: default config passes no --disable-ane",
           SplashProcess.buildLaunchArgs(withAne(false), supports: ane).contains("--disable-ane"), false)
 
+    // `--allow-idle-sleep` is splash 1.4.0+: boolean shape, same gate, so an
+    // older binary never sees a flag strict parse_args would reject.
+    func withIdleSleep(_ on: Bool) -> SplashConfig {
+        var z = SplashConfig()
+        z.allowIdleSleep = on
+        return z
+    }
+    check("gated: --allow-idle-sleep passes when the binary advertises it",
+          SplashProcess.buildLaunchArgs(withIdleSleep(true), supports: ["--allow-idle-sleep"]).contains("--allow-idle-sleep"), true)
+    check("gated: --allow-idle-sleep is dropped when the probe found nothing",
+          SplashProcess.buildLaunchArgs(withIdleSleep(true), supports: []).contains("--allow-idle-sleep"), false)
+    check("gated: default config passes no --allow-idle-sleep",
+          SplashProcess.buildLaunchArgs(withIdleSleep(false), supports: ["--allow-idle-sleep"]).contains("--allow-idle-sleep"), false)
+    check("saved config keeps allowIdleSleep",
+          try! JSONDecoder().decode(SplashConfig.self, from: Data(#"{"allowIdleSleep":true}"#.utf8)).allowIdleSleep, true)
+
     // `--persistent-cache` without a tier is not a warning, it is exit 2:
     // "splash: error: --persistent-cache needs --max-cache-disk". Settings
     // disables the toggle when the tier is off but never clears the stored

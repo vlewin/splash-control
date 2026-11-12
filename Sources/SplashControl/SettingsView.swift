@@ -891,6 +891,13 @@ struct SettingsView: View {
           isOn: $config.config.disableAne,
           help: "1.3.0 enables the ANE split by default; this keeps the FFN on the GPU.")
         toggleRow(
+          "Allow Idle Sleep", "Let the Mac sleep while requests run (--allow-idle-sleep)",
+          warning: config.config.allowIdleSleep
+            && !process.launchArgs.contains("--allow-idle-sleep")
+            ? "On but not passed — the resolved splash binary predates 1.4.0" : nil,
+          isOn: $config.config.allowIdleSleep,
+          help: "Off is the server default: the Mac stays awake until requests finish.")
+        toggleRow(
           "Disable Web UI", "Disable the browser chat interface (--no-webui)",
           isOn: $config.config.noWebUI)
         toggleRow(
