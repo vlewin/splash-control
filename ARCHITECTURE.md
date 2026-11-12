@@ -113,6 +113,7 @@ Flag rules:
 - `--idle-release` accepts only `off` or numbers with single `s`/`m`/`h` suffix (`15` = 15 seconds).
 - `extraArgs` cannot pass request parameters (e.g. `--temperature` will crash-loop).
 - `--allow-idle-sleep` (1.4.0+) is a bare boolean: on lets the Mac sleep while requests run; off (the server default) keeps it awake until they finish.
+- Deliberately unexposed — reachable only through `extraArgs`, and no Settings row until a failure shows up: `--queue-size` (default 32; single-user scale, no 503 in the tray's own log), `--request-timeout` (default none; anything shorter than the worst legitimate 147k-token decode kills real work) and `--thinking-token-budget` (default none; `thinking_token_budget` is a request body field, so a server-wide default would cap only the clients that sent none).
 - Reasoning effort is a prompt template variable, not an engine flag. All seven names (`none minimal low medium high xhigh max`) are accepted on every reasoning model; `/v1/models`' `reasoning.efforts` lists only the efforts whose prompts render *differently*, so aliases collapse — `high`/`max` into `xhigh`, `minimal` into `low`. A model advertising `["low","medium","xhigh"]` still accepts `high`; it just renders as `xhigh`. The `default` field is `--default-reasoning-effort` (or `SPLASH_DEFAULT_REASONING_EFFORT`), applied only to requests that send none.
 
 ### 4.7 Memory, SSD cache & quotas
