@@ -136,6 +136,10 @@ struct ZoomSwitch: View {
       .animation(.easeOut(duration: 0.12), value: isOn)
       .contentShape(Capsule())
       .onTapGesture { if isEnabled { isOn.toggle() } }
+      // Hand the drawing-only capsule back its switch semantics: without this
+      // VoiceOver has no element to focus and the keyboard has nothing to
+      // activate, which the native `Toggle` this replaced provided for free.
+      .accessibilityRepresentation { Toggle("", isOn: $isOn) }
       .opacity(isEnabled ? 1 : 0.4)
   }
 }
