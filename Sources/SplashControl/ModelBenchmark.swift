@@ -33,15 +33,17 @@ enum BenchRules {
   /// Greedy. Sampling was measured 17 % slower with no quality difference, and
   /// greedy is reproducible, which matters more than the 17 %.
   static let temperature = 0.0
-  /// The only values splash 1.1.0 accepts. Probed live: `low`, `medium`,
-  /// `high`, `xhigh` all return 200, and anything else fails with
-  /// `invalid reasoning_effort`. So the picker offers exactly these four
-  /// rather than a free-text field that could be typed wrong.
+  /// Live probe on splash 1.6.0: all seven efforts (`none minimal low medium
+  /// high xhigh max`) return 200; anything else fails with
+  /// `invalid reasoning_effort`. The picker stays at four: `none` and `minimal`
+  /// are not benchmark workloads, and `max` renders identically to `xhigh`
+  /// (ARCHITECTURE.md § 4.6), so a fifth row would measure nothing new.
   static let efforts = ["low", "medium", "high", "xhigh"]
 
-  /// Default, not the server's own default `xhigh`: at xhigh these models
-  /// return empty content on short prompts (ARCHITECTURE.md § 4.6, "empty answers at
-  /// default effort"), which would score as a fast, terrible run.
+  /// Default. Not `xhigh`: thinking tokens are drawn from the same `max_tokens`
+  /// pool as the answer, so on a short prompt the highest effort leaves less of
+  /// the budget for the reply (measured live on splash 1.6.0: 62 of 75
+  /// completion tokens were reasoning at `xhigh`, 30 characters of content).
   static let reasoningEffort = "medium"
   /// Token budget per effort. Reasoning tokens are drawn from the **same**
   /// `max_tokens` pool as the answer, so a 512 budget at `high` effort is spent

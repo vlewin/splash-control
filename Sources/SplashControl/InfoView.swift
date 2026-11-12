@@ -26,8 +26,8 @@ struct InfoView: View {
   @ObservedObject var updates = UpdateManager.shared
 
   /// Tested-against splash range ("supported" = releases this app renders
-  /// fully). Floor 1.2.0 = status schema 6, the DTO's model; max 1.5.0 = the
-  /// supported release range (its `/status` is still schema 6; the native wire
+  /// fully). Floor 1.2.0 = status schema 6, the DTO's model; max 1.6.0 = the
+  /// newest verified release, whose `/status` is schema 8 (the native wire
   /// protocol is a separate version number this app never speaks). Keep in sync
   /// with ARCHITECTURE.md § 4.1; the agent that re-verifies against a new
   /// splash release updates both in the same PR.
