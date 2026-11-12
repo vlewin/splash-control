@@ -122,12 +122,15 @@ struct ZoomSwitch: View {
   var body: some View {
     Capsule()
       .fill(isOn ? Color.accentColor : Color(nsColor: .quaternaryLabelColor))
-      .frame(width: 38 * s, height: 22 * s)
+      // 54 x 24 pt with a 20 pt knob is the native switch this replaces,
+      // measured off a 100 % capture on the platform floor; the earlier
+      // 38 x 22 shrank the control at 100 % instead of only at zoom steps.
+      .frame(width: 54 * s, height: 24 * s)
       .overlay(alignment: isOn ? .trailing : .leading) {
         Circle()
           .fill(.white)
           .shadow(color: .black.opacity(0.25), radius: 1, y: 0.5)
-          .frame(width: 18 * s, height: 18 * s)
+          .frame(width: 20 * s, height: 20 * s)
           .padding(2 * s)
       }
       .animation(.easeOut(duration: 0.12), value: isOn)
