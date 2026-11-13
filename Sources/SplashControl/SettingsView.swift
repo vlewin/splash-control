@@ -703,7 +703,26 @@ struct SettingsView: View {
           isOn: $config.config.autoStart)
         toggleRow(
           "Stop server on quit", "Terminate splash server when SplashControl exits",
-          isOn: $config.config.stopOnQuit)
+          isOn: Binding(
+            get: { config.config.stopOnQuit },
+            set: { on in
+              guard !on else {
+                // On: the quit alert confirms the stop at the moment it
+                // matters, so flipping the switch needs no second dialog.
+                config.config.stopOnQuit = true
+                return
+              }
+              // Off is the silent direction — quit stops asking altogether —
+              // so the consequence is confirmed once, here.
+              let alert = NSAlert()
+              alert.messageText = "Keep the server running after quit?"
+              alert.informativeText =
+                "Splash Control will no longer ask at quit and will leave the server running. Nothing restarts it later if it exits on its own."
+              alert.addButton(withTitle: "Keep Running")
+              alert.addButton(withTitle: "Cancel")
+              if alert.runModal() == .alertFirstButtonReturn { config.config.stopOnQuit = false }
+            }
+          ))
         toggleRow(
           "Menu bar token rate", "Show decode tokens/sec beside the tray icon",
           isOn: $config.config.showTrayTps)
