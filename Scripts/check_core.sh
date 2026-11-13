@@ -111,8 +111,8 @@ lint_check "no stale 560 branch floor fights auto-fit" \
 # 8. Extra Serve Args is a full-width multiline editor, not the 240 pt single
 #    line that clipped every real-world value. A Toggle announces the alias;
 #    a text field names it.
-lint_check "extraArgs is a multiline TextEditor" \
-    "grep -A 12 'Text(\"Extra Serve Args\")' Sources/SplashControl/SettingsView.swift | grep -q 'TextEditor'"
+lint_check "extraArgs is a multiline literal-text editor" \
+    "grep -A 12 'Text(\"Extra Serve Args\")' Sources/SplashControl/SettingsView.swift | grep -q 'LiteralTextEditor'"
 lint_check "announce toggle is paired to the alias name" \
     "grep -q 'announceServedName' Sources/SplashControl/SettingsView.swift"
 
@@ -215,7 +215,30 @@ let full = dto("""
  "ane_ffn":{"state":"split","share":0.41,"minimum_rows":640,"reason":"r","split_commands":3,
   "reruns":1,"ane_ms":1234.5,"evaluations":192},
  "active_requests":[{"id":101,"phase":"prefill","prompt_tokens":100}],
- "streamed_experts":{"arena_bytes":28140158976,"slots":20356,"experts":24576}}
+ "streamed_experts":{"arena_bytes":28140158976,"slots":20356,"experts":24576},
+ "verify_rows":"auto",
+ "streamed_table":{"table":"per_layer_token_embd.weight","table_bytes":28800138240,"cache_bytes":536870906,
+   "cache_capacity_rows":4427535,"cached_rows":3841237,"evictions":0,"read_bytes":345711330,
+   "read_retries":0,"read_errors":0,"poisoned":false,"failure":"",
+   "prefill":{"stages":1477,"requested_rows":17199504,"unique_rows":11259054,"hit_rows":10939023,
+     "read_rows":320031,"hit_rate":0.9715756759}},
+ "kv_spill":{"spill_moves":3,"unspills":1,"rewrites":2,"index_runway_bytes":6291456,
+   "quota":{"active_limit_bytes":34359738368,"held_bytes":1024,"committed_bytes":512,"revoked":0},
+   "requests":{"spill":4,"resident":281,"converted":1,"bounded":0,"length_ends":0,"waiting_quota":0,
+     "refused":{"quota":2,"write_budget":1,"closed":0}}},
+ "memory_audit":{"scope":"startup_warmup","valid":true,"error":"none","categorized_bytes":41527061312,
+   "backend_unclassified_bytes":598016,"device_untracked_bytes":9909440,
+   "device_peak_deviation_basis_points":0,"actual_headroom_bytes":12475093162,
+   "backend_allocated_bytes":41527659328,"device_current_allocated_bytes":41537568768,
+   "device_peak_allocated_bytes":41537568768,"backend_peak_allocated_bytes":41527659328},
+ "model_timing":{"scope":"model_lifetime",
+   "prefill":{"last_gpu_ms":1527.19,"last_wall_ms":1528.56,"total_gpu_ms":1280171.92,"total_wall_ms":1282128.10},
+   "decode":{"last_gpu_ms":40.93,"last_wall_ms":41.17,"total_gpu_ms":1764961.09,"total_wall_ms":1775965.30}},
+ "warmup":{"prefill_2048":true,"decode_b1":true,"decode_b2":true,"decode_b3":true,"decode_b4":true,
+   "composite_state_restore":true,"memory_limited_steps":["decode_b4"],"detail":"real 2048-row KV target+draft prefill [M32]"},
+ "draft_context":{"target_prefill_rows":1074969,"prompt_end_rows":7801,"materialization_rows":625536,
+   "avoided_rows":441632,"restore_skipped":18,"resets":247},
+ "reasoning_switch":true}
 """)
 
 // BUG-9 guard, generalised. This has now bitten three times in one session: a
@@ -228,10 +251,24 @@ let full = dto("""
 // it needs no CaseIterable synthesis.
 let stored = Set(Mirror(reflecting: full).children.compactMap { $0.label })
 // Five properties are legitimately spelled differently on the wire
-// (memoryGovernor -> memory_governor), so compare like with like.
+// (memoryGovernor -> memory_governor), so compare like with like. A digit in a
+// wire key (`prefill_2048`) has no uppercase to mark the boundary, so a digit
+// after a lowercase letter gets its own underscore too — but never one that
+// doubles up on an uppercase boundary (`decodeB1` is `decode_b1`, not
+// `decode_b_1`).
 func snake(_ s: String) -> String {
     var out = ""
-    for c in s { c.isUppercase ? out.append("_" + c.lowercased()) : out.append(c) }
+    var afterUppercase = false
+    for c in s {
+        if c.isUppercase {
+            out.append("_" + c.lowercased())
+            afterUppercase = true
+        } else {
+            if c.isNumber && !afterUppercase && !out.isEmpty && out.last!.isLetter { out.append("_") }
+            out.append(c)
+            afterUppercase = false
+        }
+    }
     return out
 }
 let emitted = Set((try! JSONSerialization.jsonObject(
@@ -289,6 +326,23 @@ check("streamed_experts.arena_bytes", full.streamedExperts?.arenaBytes, 28140158
 check("streamed_experts.slots", full.streamedExperts?.slots, 20356)
 check("streamed_experts.experts", full.streamedExperts?.experts, 24576)
 
+// 1.4.0/1.5.0 sections. Shape pins on values a probe could not vary: the
+// payload above is written in this file, so every key here is a CodingKeys test.
+check("verify_rows", full.verifyRows, "auto")
+check("streamed_table.cache_capacity_rows", full.streamedTable?.cacheCapacityRows, 4427535)
+check("streamed_table.prefill.hit_rate", full.streamedTable?.prefill?.hitRate, 0.9715756759)
+check("streamed_table.poisoned", full.streamedTable?.poisoned, false)
+check("kv_spill.spill_moves", full.kvSpill?.spillMoves, 3)
+check("kv_spill.quota.active_limit_bytes", full.kvSpill?.quota?.activeLimitBytes, 34359738368)
+check("kv_spill.requests.refused.write_budget", full.kvSpill?.requests?.refused?.writeBudget, 1)
+check("memory_audit.valid", full.memoryAudit?.valid, true)
+check("memory_audit.categorized_bytes", full.memoryAudit?.categorizedBytes, 41527061312)
+check("model_timing.prefill.total_gpu_ms", full.modelTiming?.prefill?.totalGpuMs, 1280171.92)
+check("warmup.decode_b4", full.warmup?.decodeB4, true)
+check("warmup.memory_limited_steps", full.warmup?.memoryLimitedSteps, ["decode_b4"])
+check("draft_context.avoided_rows", full.draftContext?.avoidedRows, 441632)
+check("reasoning_switch", full.reasoningSwitch, true)
+
 // Schema 6 renamed four keys. The all-keys payload above carries BOTH
 // spellings, so these four assertions pin the coalescing order: the schema 6
 // key must win, or a 1.2.0 server would be read through the 1.1.0 fallback.
@@ -316,9 +370,26 @@ check("schema 5 governor.observedResidentBytes still decodes", v5.memoryGovernor
 // assertion stayed green and six tiles rendered "—": a closed loop, green on a
 // schema that no longer exists. So check the declared keys against a real
 // captured `/status` instead. This is the check that would have caught it.
-if let raw = try? String(contentsOfFile: "Tests/Fixtures/status_schema6.json", encoding: .utf8),
-   let captured = try? JSONSerialization.jsonObject(with: Data(raw.utf8)) as? [String: Any] {
-    check("fixture is the schema this DTO claims to mirror", captured["schema_version"] as? Int, 6)
+// Union every captured fixture: the 1.2 capture predates the sections added
+// later, and judging a new section against it would flag it as dropped.
+var captured: [String: Any] = [:]
+var highestSchema = 0
+for name in ((try? FileManager.default.contentsOfDirectory(atPath: "Tests/Fixtures")) ?? [])
+  where name.hasPrefix("status_schema") {
+  guard let data = FileManager.default.contents(atPath: "Tests/Fixtures/\(name)"),
+        let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { continue }
+  highestSchema = max(highestSchema, root["schema_version"] as? Int ?? 0)
+  for (key, value) in root {
+    if captured[key] == nil {
+      captured[key] = value
+    } else if let older = captured[key] as? [String: Any], let newer = value as? [String: Any] {
+      captured[key] = older.merging(newer) { existing, _ in existing }
+    }
+  }
+}
+
+if !captured.isEmpty {
+    check("the newest fixture is the schema this DTO claims to mirror", highestSchema, 8)
 
     // Legacy spellings are legal precisely because a schema 5 server sends them.
     // Anything not on this list is a key the server has never sent.
@@ -333,7 +404,10 @@ if let raw = try? String(contentsOfFile: "Tests/Fixtures/status_schema6.json", e
         let paths = ["kv": ["kv"], "state": ["state"], "cache": ["cache"],
                      "disk": ["disk"], "memory_actual": ["memoryActual"],
                      "memory_governor": ["memoryGovernor"],
-                     "admission": ["admission"]]
+                     "admission": ["admission"],
+                     "streamed_table": ["streamedTable"], "kv_spill": ["kvSpill"],
+                     "memory_audit": ["memoryAudit"], "model_timing": ["modelTiming"],
+                     "warmup": ["warmup"], "draft_context": ["draftContext"]]
         let path = paths[section]?[0] ?? section
         let value: Any? = Mirror(reflecting: full).children
             .first { $0.label == path }?.value
@@ -351,15 +425,16 @@ if let raw = try? String(contentsOfFile: "Tests/Fixtures/status_schema6.json", e
         func encode(to encoder: Encoder) throws { try encodeClosure(encoder) }
     }
 
-    for section in ["kv", "state", "cache", "disk", "memory_actual", "memory_governor", "admission"] {
+    for section in ["kv", "state", "cache", "disk", "memory_actual", "memory_governor", "admission",
+                    "streamed_table", "kv_spill", "memory_audit", "model_timing", "warmup", "draft_context"] {
         // Only the phantom direction is a bug. A server key this DTO does not
         // model is the deliberate-subset case the file doc comment describes, so
         // demanding full coverage would force ~35 fields nobody reads.
         let phantom = declaredKeys(section).subtracting(serverKeys(section)).subtracting(legacyOnly)
-        check("schema 6: \(section) declares no key the server dropped", phantom, [])
+        check("captured schemas: \(section) declares no key the server dropped", phantom, [])
     }
 } else {
-    check("schema 6 fixture readable", "Tests/Fixtures/status_schema6.json missing or unparseable", "readable")
+    check("status fixtures readable", "no Tests/Fixtures/status_schema6*.json parseable", "parseable")
 }
 
 // Absent keys must stay nil, not throw: the server may predate them.
@@ -974,6 +1049,22 @@ check("languageOnly survives a save/load round-trip",
           SplashProcess.buildLaunchArgs(withAne(true), supports: []).contains("--disable-ane"), false)
     check("gated: default config passes no --disable-ane",
           SplashProcess.buildLaunchArgs(withAne(false), supports: ane).contains("--disable-ane"), false)
+
+    // `--allow-idle-sleep` is splash 1.4.0+: boolean shape, same gate, so an
+    // older binary never sees a flag strict parse_args would reject.
+    func withIdleSleep(_ on: Bool) -> SplashConfig {
+        var z = SplashConfig()
+        z.allowIdleSleep = on
+        return z
+    }
+    check("gated: --allow-idle-sleep passes when the binary advertises it",
+          SplashProcess.buildLaunchArgs(withIdleSleep(true), supports: ["--allow-idle-sleep"]).contains("--allow-idle-sleep"), true)
+    check("gated: --allow-idle-sleep is dropped when the probe found nothing",
+          SplashProcess.buildLaunchArgs(withIdleSleep(true), supports: []).contains("--allow-idle-sleep"), false)
+    check("gated: default config passes no --allow-idle-sleep",
+          SplashProcess.buildLaunchArgs(withIdleSleep(false), supports: ["--allow-idle-sleep"]).contains("--allow-idle-sleep"), false)
+    check("saved config keeps allowIdleSleep",
+          try! JSONDecoder().decode(SplashConfig.self, from: Data(#"{"allowIdleSleep":true}"#.utf8)).allowIdleSleep, true)
 
     // `--persistent-cache` without a tier is not a warning, it is exit 2:
     // "splash: error: --persistent-cache needs --max-cache-disk". Settings
@@ -2218,6 +2309,16 @@ do {
     check("a mixed-case query still matches",
           LogsView.highlighted("Done done DONE", needle: "done")
               .runs.filter { $0.backgroundColor != nil }.count, 3)
+
+    // The pane renders those runs through `LogText` as AppKit attributes, so
+    // the run mapping is what can silently drop or reorder characters.
+    let rendered = LogText.attributed(["23:01:06 Done · input 1,008", "second line"], needle: "done")
+    check("the rendered pane text is exactly the lines",
+          rendered.string, "23:01:06 Done · input 1,008\nsecond line\n")
+    check("the rendered match keeps its tint",
+          rendered.attribute(.backgroundColor, at: 9, effectiveRange: nil) != nil, true)
+    check("the rendered non-match carries no tint",
+          rendered.attribute(.backgroundColor, at: 20, effectiveRange: nil) == nil, true)
 }
 
 // MARK: - PowerMode caching (2.1)
@@ -2261,9 +2362,11 @@ swiftc -O -o "$work/check" \
   Sources/SplashControl/ModelCatalog.swift \
   Sources/SplashControl/ModelStats.swift \
   Sources/SplashControl/LogsView.swift \
+  Sources/SplashControl/LogTextView.swift \
   Sources/SplashControl/ContentHeight.swift \
   Sources/SplashControl/ZoomControls.swift \
   Sources/SplashControl/FixedSegmented.swift \
+  Sources/SplashControl/LiteralTextEditor.swift \
   Sources/SplashControl/SettingsView.swift \
   Sources/SplashControl/HardwareTelemetry.swift \
   Sources/SplashControl/StatsModel.swift \

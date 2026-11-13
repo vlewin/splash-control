@@ -239,15 +239,33 @@ radio buttons) and settles the resize animation before capturing; omitting the
 tab captures the current window as-is and fails if the dashboard was never
 opened.
 
-Inspect the PNG with your image-viewing tool. Do not measure pixels or probe
-the accessibility tree:
+Inspect the PNG with your image-viewing tool. A capture settles **appearance**
+only — layout, clipping, heights, spacing at small widths. Do not measure
+pixels:
 
 - Never blind-coordinate clicks (`osascript … click at {x, y}`). They land in
   whatever window happens to be at those coordinates — this has typed into an
   unrelated application's input field before.
-- Never ad-hoc `osascript` System Events probes for `size of window`,
-  `scroll area`, `scroll bar`, or an AX hierarchy. They fail with AppleScript
-  type errors (`-1700`) and unreadable indices (`-1719`) under AppKit/SwiftUI
-  hosting, and burn execution cycles.
+- Never probe `size of window`, `scroll area`, `scroll bar` or the AX
+  hierarchy to *measure layout*. Those fail with AppleScript type errors
+  (`-1700`) and unreadable indices (`-1719`) under AppKit/SwiftUI hosting, and
+  burn execution cycles.
 - If the construction is mathematically sound and the capture looks clean,
   accept it. Captures are smoke tests for human inspection, not measurements.
+
+### State is proved through System Events, not pixels
+
+Whether a field holds the text that was typed, whether that text reached the
+config file, whether a menu item's key equivalent routes to the focused editor,
+whether a click switched tab — no PNG can contain any of it. Assert those with
+`osascript` against the bundle in `dist/`, and cite the observed value plus the
+file or pasteboard it landed in. Three traps, each of which makes a working app
+look broken:
+
+- `activate` the bundle id before sending keystrokes. Otherwise they go to
+  whatever is frontmost and fail silently — the field looks dead, the test is
+  wrong.
+- SwiftUI exposes empty `title`/`description`/`help` on toolbar controls.
+  Address them by index (`radio button 5`), not by name.
+- Collapsed disclosures hide their children from the tree. Expand first, or the
+  control does not exist yet.

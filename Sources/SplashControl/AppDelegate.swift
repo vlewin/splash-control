@@ -61,6 +61,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // that loaded a snapshot and then quit would flush that stale snapshot
     // over whatever the live owner has accumulated since.
     ownsHistory = true
+    installEditMenu()
     modelStats.load()  // long-term per-model history survives restarts
 
     process = SplashProcess(config: config.config)
@@ -147,6 +148,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
   /// Points the sample recorder at the long-term store, using the current
   /// server settings as the comparability key.
+  /// A tray app that never sets `mainMenu` has no Edit menu, so ⌘C/⌘V/⌘A have
+  /// no key equivalent to match and never reach the focused text view — the
+  /// Settings text fields could only be edited through the context menu. The
+  /// standard selectors route to whichever responder is first.
+  private func installEditMenu() {
+    let mainMenu = NSMenu()
+    let appItem = NSMenuItem()
+    appItem.submenu = NSMenu(title: "Splash Control")
+    mainMenu.addItem(appItem)
+    let editItem = NSMenuItem()
+    let edit = NSMenu(title: "Edit")
+    editItem.submenu = edit
+    mainMenu.addItem(editItem)
+    edit.addItem(withTitle: "Undo", action: Selector(("undo:")), keyEquivalent: "z")
+    let redo = edit.addItem(withTitle: "Redo", action: Selector(("redo:")), keyEquivalent: "z")
+    redo.keyEquivalentModifierMask = [.command, .shift]
+    edit.addItem(.separator())
+    edit.addItem(withTitle: "Cut", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
+    edit.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+    edit.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+    edit.addItem(
+      withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+    NSApp.mainMenu = mainMenu
+  }
+
   private func syncHistoryConditions() {
     let c = config.config
     stats.history = modelStats

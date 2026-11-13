@@ -181,7 +181,7 @@ final class SplashProcess: ObservableObject {
   /// never passed, whatever the config says.
   nonisolated static let gatedFlags = [
     "--persistent-cache", "--idle-release", "--served-model-name", "--announce-served-name",
-    "--default-reasoning-effort", "--disable-ane", "--state-format",
+    "--default-reasoning-effort", "--disable-ane", "--state-format", "--allow-idle-sleep",
     "--expert-memory", "--ple-memory", "--sparse-kv-memory", "--verify-rows",
   ]
 
@@ -207,6 +207,7 @@ final class SplashProcess: ObservableObject {
     if config.announceServedName { want.append("--announce-served-name") }
     if let e = config.reasoningEffort, !e.isEmpty { want.append("--default-reasoning-effort") }
     if config.disableAne { want.append("--disable-ane") }
+    if config.allowIdleSleep { want.append("--allow-idle-sleep") }
     if let sf = config.stateFormat, !sf.isEmpty { want.append("--state-format") }
     if let v = config.expertMemory, !v.isEmpty { want.append("--expert-memory") }
     if let v = config.pleMemory, !v.isEmpty { want.append("--ple-memory") }
@@ -329,6 +330,11 @@ final class SplashProcess: ObservableObject {
     // nothing. `--disable-ane` is 1.3.0+; older binaries reject it outright.
     if cfg.disableAne, supports.contains("--disable-ane") {
       args += ["--disable-ane"]
+    }
+    // Same boolean gate: a binary predating 1.4.0 rejects it under strict
+    // parse_args. Independent of `--idle-release`, which is about weights.
+    if cfg.allowIdleSleep, supports.contains("--allow-idle-sleep") {
+      args += ["--allow-idle-sleep"]
     }
     // `--announce-served-name` without a name is refused by the same logic:
     // it is only meaningful alongside `--served-model-name`, so the pairing

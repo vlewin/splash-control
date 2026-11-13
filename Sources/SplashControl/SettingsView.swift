@@ -891,6 +891,13 @@ struct SettingsView: View {
           isOn: $config.config.disableAne,
           help: "1.3.0 enables the ANE split by default; this keeps the FFN on the GPU.")
         toggleRow(
+          "Allow Idle Sleep", "Let the Mac sleep while requests run (--allow-idle-sleep)",
+          warning: config.config.allowIdleSleep
+            && !process.launchArgs.contains("--allow-idle-sleep")
+            ? "On but not passed — the resolved splash binary predates 1.4.0" : nil,
+          isOn: $config.config.allowIdleSleep,
+          help: "Off is the server default: the Mac stays awake until requests finish.")
+        toggleRow(
           "Disable Web UI", "Disable the browser chat interface (--no-webui)",
           isOn: $config.config.noWebUI)
         toggleRow(
@@ -905,16 +912,17 @@ struct SettingsView: View {
             .font(f(.caption))
             .foregroundStyle(.tertiary)
             .lineLimit(1)
-          TextEditor(
+          LiteralTextEditor(
             text: Binding(
               get: { config.config.extraArgs ?? "" },
               set: { val in
-                let trimmed = val.trimmingCharacters(in: .whitespaces)
-                config.config.extraArgs = trimmed.isEmpty ? nil : trimmed
+                // Kept verbatim: trimming per keystroke deletes the space the
+                // user just typed, so a second flag can never be entered. The
+                // launcher splits on whitespace, so stray edges are harmless.
+                config.config.extraArgs = val.isEmpty ? nil : val
               }
             )
           )
-          .font(f(.body, nil, design: .monospaced))
           .frame(minHeight: 56, maxHeight: 84)
           .padding(4)
           .background(Color.primary.opacity(0.03), in: RoundedRectangle(cornerRadius: 6))
