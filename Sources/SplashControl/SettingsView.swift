@@ -912,7 +912,7 @@ struct SettingsView: View {
             .font(f(.caption))
             .foregroundStyle(.tertiary)
             .lineLimit(1)
-          TextEditor(
+          LiteralTextEditor(
             text: Binding(
               get: { config.config.extraArgs ?? "" },
               set: { val in
@@ -923,7 +923,6 @@ struct SettingsView: View {
               }
             )
           )
-          .font(f(.body, nil, design: .monospaced))
           .frame(minHeight: 56, maxHeight: 84)
           .padding(4)
           .background(Color.primary.opacity(0.03), in: RoundedRectangle(cornerRadius: 6))

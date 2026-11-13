@@ -111,8 +111,8 @@ lint_check "no stale 560 branch floor fights auto-fit" \
 # 8. Extra Serve Args is a full-width multiline editor, not the 240 pt single
 #    line that clipped every real-world value. A Toggle announces the alias;
 #    a text field names it.
-lint_check "extraArgs is a multiline TextEditor" \
-    "grep -A 12 'Text(\"Extra Serve Args\")' Sources/SplashControl/SettingsView.swift | grep -q 'TextEditor'"
+lint_check "extraArgs is a multiline literal-text editor" \
+    "grep -A 12 'Text(\"Extra Serve Args\")' Sources/SplashControl/SettingsView.swift | grep -q 'LiteralTextEditor'"
 lint_check "announce toggle is paired to the alias name" \
     "grep -q 'announceServedName' Sources/SplashControl/SettingsView.swift"
 
@@ -2366,6 +2366,7 @@ swiftc -O -o "$work/check" \
   Sources/SplashControl/ContentHeight.swift \
   Sources/SplashControl/ZoomControls.swift \
   Sources/SplashControl/FixedSegmented.swift \
+  Sources/SplashControl/LiteralTextEditor.swift \
   Sources/SplashControl/SettingsView.swift \
   Sources/SplashControl/HardwareTelemetry.swift \
   Sources/SplashControl/StatsModel.swift \
