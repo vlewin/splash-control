@@ -581,7 +581,7 @@ final class SplashProcess: ObservableObject {
   /// disk half-written. SIGTERM lets splash unmap its Metal allocations and
   /// close its sockets cleanly. The timeout is bounded because a wedged engine
   /// must not hold up a restart forever.
-  private func terminate(pid: pid_t, grace: TimeInterval = 2.5) async {
+  private nonisolated static func terminate(pid: pid_t, grace: TimeInterval = 2.5) async {
     guard pid > 0 else { return }
     kill(pid, SIGTERM)
     var waited = 0.0
@@ -595,7 +595,40 @@ final class SplashProcess: ObservableObject {
     }
   }
 
+  /// Await `terminate` for every pid in the list.
+  ///
+  /// Deliberately takes pids instead of discovering them from the port, so
+  /// the wait itself is testable without a listener or a splash binary
+  /// (issue #59).
+  nonisolated static func terminateAndWait(pids: [pid_t]) async {
+    for pid in pids { await terminate(pid: pid) }
+  }
+
+  /// `stopExternal()`, but returns only once each former listener is gone.
+  ///
+  /// Use this whenever something spawns *after* the stop (the autoStart
+  /// launch path): splash refuses a second `serve` while the old process is
+  /// still alive — "Splash is already serving (PID …)", exit 1 — even though
+  /// the SIGTERM was already delivered, so a spawn that does not wait for
+  /// the exit either dies immediately or, if `listenerPids` still sees the
+  /// dying process, adopts a server about to vanish. `start()` re-checks
+  /// `listenerPids` after this returns: free → launch, occupied → adopt.
+  func stopExternalAndWait() async {
+    let pids = Self.listenerPids(port: config.port) ?? []
+    if pids.isEmpty {
+      SplashLog.shared.log("stop_external pids=none port=\(config.port) (no listener found)")
+    } else {
+      SplashLog.shared.log("stop_external_wait pids=\(pids) port=\(config.port)")
+      await Self.terminateAndWait(pids: pids)
+    }
+    state = .stopped
+  }
+
   /// Kill whatever is listening on the configured port (covers external starts).
+  ///
+  /// Fire-and-forget on purpose: its callers (the tray stop, the quit flow)
+  /// never spawn afterwards, so nothing can race the shutdown it starts.
+  /// Anything that launches *after* stopping must use `stopExternalAndWait()`.
   func stopExternal() {
     if let pids = Self.listenerPids(port: config.port), !pids.isEmpty {
       SplashLog.shared.log("stop_external pids=\(pids) port=\(config.port)")
@@ -632,10 +665,10 @@ final class SplashProcess: ObservableObject {
       SplashLog.shared.log("hard_reset mode=launched pid=\(proc.processIdentifier)")
       let pid = proc.processIdentifier
       process = nil
-      await terminate(pid: pid)
+      await Self.terminate(pid: pid)
     } else if let pids = Self.listenerPids(port: config.port), !pids.isEmpty {
       SplashLog.shared.log("hard_reset mode=external pids=\(pids) port=\(config.port)")
-      for pid in pids { await terminate(pid: pid) }
+      await Self.terminateAndWait(pids: pids)
     } else {
       SplashLog.shared.log(
         "hard_reset mode=external pids=none port=\(config.port) (no listener; plain restart)")
