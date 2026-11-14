@@ -606,6 +606,19 @@ final class SplashProcess: ObservableObject {
     state = .stopped
   }
 
+  /// Stop whatever listens on the port **and wait for it to be gone**.
+  ///
+  /// `stopExternal()` returns while the old server is still shutting down, and
+  /// `start()` then spawns into a port splash still owns: the child exits with
+  /// "already serving (PID …)" and nothing is left running (issue #59). The
+  /// launch path uses this instead, so the wait happens before the spawn.
+  func stopExternalAndWait() async {
+    guard let pids = Self.listenerPids(port: config.port), !pids.isEmpty else { return }
+    SplashLog.shared.log("stop_external_wait pids=\(pids) port=\(config.port)")
+    for pid in pids { await terminate(pid: pid) }
+    state = .stopped
+  }
+
   /// Restarts the server, launching `config.model`.
   ///
   /// `serving` is the model `/status` reports, when known. A restart always

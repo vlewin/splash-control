@@ -124,7 +124,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     ModelCatalog.startWatching()
 
     if config.config.autoStart {
-      process.start()
+      // Wait for a server this instance did not spawn to actually exit first:
+      // spawning while it still owns the port makes splash refuse with
+      // "already serving" and leaves no server running (issue #59).
+      Task { [weak self] in
+        guard let self else { return }
+        await self.process.stopExternalAndWait()
+        self.process.start()
+      }
     }
 
     pollTask = Task { [weak self] in
