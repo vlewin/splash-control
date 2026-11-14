@@ -183,6 +183,28 @@ func dashboardZoomSteps() {
   #expect(SplashConfig.dashboardScaleValues == [100, 125, 150, 175, 200])
 }
 
+// Fill Screen mode (issue #55): a persisted mode flag next to the step,
+// tolerant like every other field so files without the key keep loading.
+
+@Test("Fill Screen defaults off; an old config without the key decodes off")
+func dashboardFillScreenDefaultsOff() throws {
+  #expect(SplashConfig().dashboardFullScreen == false)
+  let legacy = try JSONDecoder().decode(
+    SplashConfig.self, from: Data(#"{"dashboardScale":150,"port":9000}"#.utf8))
+  #expect(legacy.dashboardFullScreen == false)
+  #expect(legacy.dashboardScale == 150)
+  #expect(legacy.port == 9000)
+}
+
+@Test("a set Fill Screen flag round-trips encode/decode")
+func dashboardFillScreenRoundTrips() throws {
+  var cfg = SplashConfig()
+  cfg.dashboardFullScreen = true
+  let back = try JSONDecoder().decode(SplashConfig.self, from: try JSONEncoder().encode(cfg))
+  #expect(back.dashboardFullScreen == true)
+  #expect(back == cfg)
+}
+
 @Test("expert RAM on auto warns only while the live store streams")
 func expertAutoWarning() throws {
   var store = try JSONDecoder().decode(
