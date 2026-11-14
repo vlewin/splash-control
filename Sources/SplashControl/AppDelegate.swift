@@ -24,6 +24,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   /// re-fits only when the step actually changed (and can scale the current
   /// height by the step ratio).
   private var lastAppliedScale = 1.0
+  /// Last Fill Screen state applied to the open window, so a mode toggle —
+  /// which leaves `dashboardScale` untouched — still re-applies the frame
+  /// through `applyDashboardZoom`'s force path (issue #55).
+  private var lastAppliedFullScreen = false
   /// Local key monitor for Cmd +/− (see `installZoomKeyShortcuts`).
   private var zoomKeyMonitor: Any?
   private var pollTask: Task<Void, Never>?
@@ -111,7 +115,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
           }
         }
         self.applyLoginItem(cfg.startOnLogin)
-        self.applyDashboardZoom(cfg.dashboardScaleFactor)
+        // Fill Screen is a mode, not a step: toggling it does not change
+        // `dashboardScaleFactor`, so the change guard in applyDashboardZoom
+        // would swallow the frame update. Tell it the mode moved.
+        let fillToggled = cfg.dashboardFullScreen != self.lastAppliedFullScreen
+        self.lastAppliedFullScreen = cfg.dashboardFullScreen
+        self.applyDashboardZoom(cfg.dashboardScaleFactor, force: fillToggled)
         self.restartPolling()
       }
       .store(in: &cancellables)
@@ -382,6 +391,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
   private func applyDashboardHeight(_ height: CGFloat, animate: Bool) {
     guard let window = dashboardWindow else { return }
+    // Fill Screen owns the frame: skip the whole content-driven refit, or the
+    // next tab switch would shrink the filled window back to its content.
+    guard !config.config.dashboardFullScreen else { return }
     let delta = height - window.frame.height
     guard abs(delta) > 0.5 else { return }
     var frame = window.frame
@@ -419,6 +431,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // follows it so the layout keeps its 100 % proportions and grown rows
     // never run past the edge. Height needs no step: tabs report their own
     // (already scaled) content height.
+    if config.config.dashboardFullScreen {
+      // Opened in Fill Screen mode (persisted across launches): take the
+      // visible frame straight away — the tab fit that follows is skipped
+      // while the mode is on, so nothing else would fill the window.
+      window.setFrame(visible, display: false)
+      return
+    }
     let width: CGFloat = 880 * CGFloat(config.config.dashboardScaleFactor)
     let height = min(visible.height - 40, 1100)
     window.setContentSize(NSSize(width: width, height: height))
@@ -459,6 +478,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     fitToScreen(window)
     window.isReleasedWhenClosed = false
     dashboardWindow = window
+    window.delegate = self
     window.makeKeyAndOrderFront(nil)
     // Not from `DashboardView.onAppear`: the hosting view appears inside
     // `NSWindow(contentViewController:)` above, before `dashboardWindow` is
@@ -508,13 +528,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   /// the layout keeps its 100 % proportions only if the frame grows with the
   /// step, so it is set here. Top-left stays pinned, so the toolbar never
   /// jumps; the frame is clamped into the visible display.
-  private func applyDashboardZoom(_ scale: Double) {
+  ///
+  /// In Fill Screen mode (issue #55) the frame is the screen's visible frame
+  /// and the step moves only the type size. The window is titled, so "Fill"
+  /// not "Full": it never takes over the display the way macOS full screen
+  /// does. A manual resize while filled is not sticky: any step pick or mode
+  /// toggle (arriving with `force`) re-asserts the frame from this rule.
+  private func applyDashboardZoom(_ scale: Double, force: Bool = false) {
     let s = CGFloat(scale)
-    guard abs(s - lastAppliedScale) > 0.001 else { return }
+    // `force` marks a Fill Screen toggle: the step is unchanged, so without
+    // it the guard below would return and the window would keep the frame
+    // of the other mode (or a manual resize made while filled).
+    guard force || abs(s - lastAppliedScale) > 0.001 else { return }
     lastAppliedScale = s
     guard let window = dashboardWindow,
       let visible = (window.screen ?? NSScreen.main)?.visibleFrame
     else { return }
+    if config.config.dashboardFullScreen {
+      SplashLog.shared.log("zoom s=\(s) fill -> \(Int(visible.width))x\(Int(visible.height))")
+      window.setFrame(visible, display: true)
+      window.displayIfNeeded()
+      return
+    }
     let width = min(880 * s, visible.width - 16)
     SplashLog.shared.log(
       "zoom s=\(s) -> width=\(Int(width)) (was \(Int(window.frame.width)))")
@@ -523,6 +558,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     frame.origin.x = min(frame.origin.x, visible.maxX - width - 8)
     frame.origin.x = max(frame.origin.x, visible.minX + 8)
     window.setFrame(frame, display: true)
+    // Leaving Fill Screen must hand the height back to the content refit:
+    // the frame above only restores the width rule, so re-fit the current
+    // tab now instead of waiting for the next content report.
+    if force {
+      resizeDashboard(forTab: navigation.selectedTab, animate: false)
+    }
     // Logs is the only tab that reports no measured height: its frame comes
     // from the `tabHeights` table times the step, applied on tab switches.
     // A zoom change re-renders its rows but refits nothing, so the window
@@ -541,5 +582,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
   private func showInfo() {
     showDashboard(tab: 5)
+  }
+}
+
+// Fill Screen keeps the frame (issue #55): AppKit clamps the window down to
+// its content floor whenever that floor drops, and the drop lands late —
+// entering `LogsView` lays out the briefly-empty list first and clamps a
+// beat after every one-shot correction has already run. Reacting to the
+// resize itself catches that late clamp (and any later one) instead of
+// racing it.
+extension AppDelegate: NSWindowDelegate {
+  func windowDidResize(_ notification: Notification) {
+    guard let window = dashboardWindow, notification.object as? NSWindow === window,
+      config.config.dashboardFullScreen, !window.inLiveResize,
+      let visible = (window.screen ?? NSScreen.main)?.visibleFrame
+    else { return }
+    // Only a frame that fell *below* the fill frame is the clamp's doing —
+    // snap it back. A manual drag that grew the window past the visible
+    // frame stays, per the mode's rule: not sticky, re-applied by the next
+    // zoom pick or relaunch. The snap-back re-enters here once, where the
+    // frame equals `visible` and the guard below ends the loop.
+    guard window.frame.height < visible.height - 0.5 || window.frame.width < visible.width - 0.5
+    else { return }
+    SplashLog.shared.log(
+      "fill snap-back \(Int(window.frame.width))x\(Int(window.frame.height)) -> \(Int(visible.width))x\(Int(visible.height))"
+    )
+    window.setFrame(visible, display: true)
   }
 }

@@ -351,6 +351,7 @@ final class TrayController: NSObject, NSMenuDelegate {
   private var zoomSelectItem: NSMenuItem!
   private var zoomMenu: NSMenu!
   private var zoomMenuItems: [NSMenuItem] = []
+  private var fillScreenItem: NSMenuItem!
   private var startItem: NSMenuItem!
   private var restartItem: NSMenuItem!
   private var stopItem: NSMenuItem!
@@ -404,6 +405,13 @@ final class TrayController: NSObject, NSMenuDelegate {
       zoomMenu.addItem(item)
       zoomMenuItems.append(item)
     }
+    // Fill Screen is a mode below the steps, not a sixth step: the title of
+    // the parent row keeps reporting the step, this row's checkmark the mode.
+    zoomMenu.addItem(.separator())
+    fillScreenItem = NSMenuItem(
+      title: "Fill Screen", action: #selector(toggleFillScreen(_:)), keyEquivalent: "")
+    fillScreenItem.target = self
+    zoomMenu.addItem(fillScreenItem)
     menu.addItem(zoomSelectItem)
 
     webuiItem = actionItem("Open WebUI", "safari", #selector(webuiAction))
@@ -682,6 +690,15 @@ final class TrayController: NSObject, NSMenuDelegate {
     config.config.dashboardScale = value
   }
 
+  /// Toggle Fill Screen mode (issue #55). Deliberately never touches
+  /// `dashboardScale`: the mode and the step are orthogonal — a step pick
+  /// never turns the mode off, a mode toggle never changes the type size.
+  /// The config sink persists it and re-applies the current step's frame
+  /// through `AppDelegate.applyDashboardZoom`'s force path.
+  @objc private func toggleFillScreen(_ sender: NSMenuItem) {
+    config.config.dashboardFullScreen.toggle()
+  }
+
   /// Rebuilds the Model submenu from the models on disk. Called on every
   /// `menuWillOpen`, so the list the user looks at is never stale: a model
   /// installed from a terminal appears the next time the menu opens, with no
@@ -816,6 +833,7 @@ final class TrayController: NSObject, NSMenuDelegate {
     for item in zoomMenuItems {
       item.state = item.tag == config.config.dashboardScale ? .on : .off
     }
+    fillScreenItem.state = config.config.dashboardFullScreen ? .on : .off
 
     // The status line above shows the *serving* model and the menu checkmark
     // follows the *configured* one, so a mismatch would otherwise be visible

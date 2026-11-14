@@ -84,6 +84,10 @@ struct SplashConfig: Codable, Equatable {
   /// Dashboard zoom in percent (`SplashConfig.dashboardScaleValues`); the tray's
   /// Zoom submenu sets it, the dashboard scales its typography and icons to it.
   var dashboardScale: Int = 100
+  /// Fill Screen mode (issue #55): the dashboard window takes the screen's
+  /// visible frame and zoom steps change only the type size. A mode, never
+  /// a sixth `dashboardScale` step; persists across launches.
+  var dashboardFullScreen: Bool = false
   /// Launch the server when the app starts
   var autoStart: Bool = false
   /// Stop a launched server when the app quits (Yes/No confirmed); false = leave it running
@@ -175,7 +179,8 @@ struct SplashConfig: Codable, Equatable {
       allowedHost,
       maxRequestSize, maxImagePixels, apiKey, extraArgs, splashPath,
       servedModelName, announceServedName, reasoningEffort,
-      showTrayTps, dashboardScale, autoStart, stopOnQuit, startOnLogin, pollIntervalSec,
+      showTrayTps, dashboardScale, dashboardFullScreen, autoStart, stopOnQuit, startOnLogin,
+      pollIntervalSec,
       windowMinutes,
       persistentCache, idleRelease,
       expertMemory, pleMemory, sparseKvMemory, verifyRows
@@ -221,6 +226,8 @@ struct SplashConfig: Codable, Equatable {
     splashPath = try c.decodeIfPresent(String.self, forKey: .splashPath) ?? d.splashPath
     showTrayTps = try c.decodeIfPresent(Bool.self, forKey: .showTrayTps) ?? d.showTrayTps
     dashboardScale = try c.decodeIfPresent(Int.self, forKey: .dashboardScale) ?? d.dashboardScale
+    dashboardFullScreen =
+      try c.decodeIfPresent(Bool.self, forKey: .dashboardFullScreen) ?? d.dashboardFullScreen
     autoStart = try c.decodeIfPresent(Bool.self, forKey: .autoStart) ?? d.autoStart
     stopOnQuit = try c.decodeIfPresent(Bool.self, forKey: .stopOnQuit) ?? d.stopOnQuit
     startOnLogin = try c.decodeIfPresent(Bool.self, forKey: .startOnLogin) ?? d.startOnLogin
