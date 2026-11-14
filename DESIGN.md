@@ -174,6 +174,15 @@ The dashboard window sizes directly to the rendered content of the active tab:
 - **Console exception**: `LogsView` is the sole view that never reports content
   height; it maintains a fixed viewport height so the window does not jitter or
   grow uncontrollably as new console lines stream in.
+- **Fill Screen exception**: with the tray's checkable *Fill Screen* mode on
+  (Zoom submenu; a persisted mode, never a sixth zoom step), the window frame
+  is the screen's visible frame and the auto-fit rule above is bypassed
+  entirely — tab switches and content reports do not resize it, and zoom steps
+  change only the type size. The mode owns the frame: AppKit's clamp of the
+  window down to a dropping content floor snaps straight back. A manual drag
+  may grow the window past the frame and keeps it until the next zoom pick or
+  relaunch re-asserts it; leaving the mode restores content-hugging sizing at
+  the current width rule.
 
 ### 2.10 Stat tile action slots
 
