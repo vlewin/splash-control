@@ -124,7 +124,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     ModelCatalog.startWatching()
 
     if config.config.autoStart {
-      process.start()
+      // Issue #59: with an external server on the port, start() would stop it
+      // via SIGTERM inside stop() and spawn immediately — splash refuses a
+      // second serve while the old process is still alive ("already serving",
+      // exit 1), and if lsof still lists the dying pid start() adopts a
+      // server about to vanish. Wait for the listener to exit first; start()
+      // then re-checks the port itself. The synchronous stopExternal() stays
+      // for the quit flow, where nothing spawns after the stop.
+      Task { [weak self] in
+        guard let self else { return }
+        await self.process.stopExternalAndWait()
+        _ = self.process.start()
+      }
     }
 
     pollTask = Task { [weak self] in
