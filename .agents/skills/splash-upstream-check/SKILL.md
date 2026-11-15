@@ -36,9 +36,12 @@ what is behaviour-only vs internal. Produces a report, never code changes.
    # or, with a checkout: git show "${TAG}:<PATH>"   # quote it: zsh reads $TAG:r as a modifier
    ```
    Pinned paths and what each answers:
-   - `runtime/engine/Status.cpp` — the only file whose change adds, renames, or
-     removes a published `/status` key (nested keys come from
-     `runtime/engine/MemoryPlan.cpp` too).
+   - `runtime/engine/Status.cpp` — engine-composed `/status` keys (nested keys
+     come from `runtime/engine/MemoryPlan.cpp` too).
+   - `server/diagnostics.py` (`console.dropped_lines`) and
+     `server/tokenization.py` (`tokenizer_cache`) — the sections the server
+     composes itself. A Status.cpp-only diff under-reports the key set: measured
+     on 1.6.0 → 1.6.1, three of the ten additive keys came from these two files.
    - `server/serve_options.py` — every `splash serve` flag, its parser, and its
      ceiling (`MAX_YARN_CONTEXT_TOKENS`, `_SIZE_UNITS`).
    - `server/protocol.py` — `STATUS_SCHEMA_VERSION` (HTTP surface we consume) vs
@@ -57,21 +60,37 @@ what is behaviour-only vs internal. Produces a report, never code changes.
    Any upstream flag the tray never emits is a **gap**, not a break: `extraArgs`
    already passes arbitrary flags through. A gap only becomes adaptation-required
    when the flag changes a ceiling the tray hard-codes (context, memory, cache).
-4. `/status` key delta, same way:
+4. `/status` key delta, same way. Engine keys are emitted through the JSON
+   writer, server-composed sections as Python dict literals — grep both:
    ```bash
    for t in <OLD> <NEW>; do
      for f in runtime/engine/Status.cpp runtime/engine/MemoryPlan.cpp; do
-       git show "${t}:$f" | rg -o '\\"[a-z_]+\\":' | sed 's/\\//g'
-     done | sort -u > keys_$t.txt
-   done
+       git show "${t}:$f" | rg -o '\.(field|object|array|key)\("[a-z_0-9]+"' | sed 's/.*("//;s/"$//'
+     done
+     for f in server/diagnostics.py server/tokenization.py; do
+       git show "${t}:$f" | rg -o '"[a-z_0-9]+":' | tr -d '":'
+     done
+   done | sort -u > keys_$t.txt
    comm -13 keys_<OLD>.txt keys_<NEW>.txt   # additive keys
    comm -23 keys_<OLD>.txt keys_<NEW>.txt   # removed keys → BREAKING
    ```
+   A `"name":` literal grep matches none of the engine source, and an empty
+   extraction then reads as "no key changed" — verify the line counts are in the
+   hundreds before believing `comm`. The set loses section paths (`evictions`
+   under `tokenizer_cache` cannot be told from an engine `evictions`), so confirm
+   a new key's container against the release notes or a capture.
    Removed or renamed keys are the only schema break; additive keys are display
    candidates. Key-walk `Tests/Fixtures/status_schema*.json` against
    `Sources/SplashControlKit/StatusDTO.swift` for DTO gaps, and note pre-existing
-   gaps separately from newly introduced ones. Fixtures are hand-trimmed to the
-   keys the tray reads, so they are not a source of truth for upstream's key set.
+   gaps separately from newly introduced ones.
+   Fixtures are **full wire captures, not trimmed** — the 1.6.0 fixture matches a
+   live 1.6.0 `/status` leaf-path for leaf-path (46 root keys, 844 paths). But a
+   capture pins one **branch** of a conditional schema, release × model class ×
+   config: `streamed_experts` is a populated object in the 1.4.0 fixture and
+   `null` in 1.5.0's and 1.6.0's; `kv_spill` and `streamed_table` are absent
+   before 1.4.0; a resident-KV target emits no `kv_spill` section at all. So
+   absent ≠ removed, and a capture never proves a key was dropped — removals come
+   from the source diff above, never from capture-vs-capture across two models.
 5. Classify every delta:
    - **adaptation-required**: removed/renamed `/status` key, a changed ceiling
      the tray hard-codes, a schema-version bump.
@@ -88,7 +107,27 @@ what is behaviour-only vs internal. Produces a report, never code changes.
    ```
    `<port>` is `config.port`, not necessarily 8000. If nothing is listening, mark
    schema facts ⚠️ unprobed and say why.
-7. Report in the repo's §14 8-section shape, with the flag table and the
+7. Fixture capture — the follow-up update task, not this check (this check
+   writes nothing). After the upgrade, take the new release's `/status` and diff
+   its leaf paths against the previous fixture **from the same model class**:
+   ```bash
+   curl -s http://127.0.0.1:<port>/status > Tests/Fixtures/status_schema<N>_<NEW>.json
+   python3 - <<'PY'
+   import json
+   def paths(o, p=''):
+       if isinstance(o, dict):
+           for k, v in o.items(): yield from paths(v, f'{p}.{k}' if p else k)
+       else: yield p
+   old, new = 'Tests/Fixtures/status_schema8_1_6_0.json', 'Tests/Fixtures/status_schema8_1_6_1.json'
+   a, b = (set(paths(json.load(open(f)))) for f in (old, new))
+   print('added:', sorted(b - a)); print('removed:', sorted(a - b))
+   PY
+   ```
+   The delta must equal the source delta from step 4 plus branch-only keys. An
+   upgrade replaces the binary, so the outgoing release's process cannot be
+   recreated — but its source stays tag-pinned, and its fixture is already in the
+   repo; capture before upgrading only when that release has no fixture yet.
+8. Report in the repo's §14 8-section shape, with the flag table and the
    removed-keys list.
 
 ## Guardrails
@@ -97,6 +136,8 @@ what is behaviour-only vs internal. Produces a report, never code changes.
   branch switches, no running its tests.
 - Never present a source-read shape as confirmed on the wire — only the live
   probe confirms the published name/shape.
+- A capture covers one branch (release × model class × config). Absent in a
+  capture is not removed; `null` and absent are different claims.
 - `STATUS_SCHEMA_VERSION` is the HTTP contract; a `PROTOCOL_VERSION` bump alone
   requires no tray change.
 - New DTO fields are always optional — never make an existing optional key
