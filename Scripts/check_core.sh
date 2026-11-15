@@ -1155,6 +1155,16 @@ check("languageOnly survives a save/load round-trip",
     check("gated: verify-rows outside the closed set is refused",
           SplashProcess.buildLaunchArgs({ var z = SplashConfig(); z.verifyRows = "turbo"; return z }(),
                                         supports: stores).contains("--verify-rows"), false)
+    // splash 1.6.1 activations: same crash-loop gate, same closed set.
+    let activations = { var z = SplashConfig(); z.activations = "bf16"; return z }()
+    check("gated: activations pass when advertised",
+          SplashProcess.buildLaunchArgs(activations, supports: ["--activations"]).suffix(2),
+          ["--activations", "bf16"])
+    check("gated: activations dropped on an old binary",
+          SplashProcess.buildLaunchArgs(activations, supports: []).contains("--activations"), false)
+    check("gated: activations outside the closed set are refused",
+          SplashProcess.buildLaunchArgs({ var z = SplashConfig(); z.activations = "int4"; return z }(),
+                                        supports: ["--activations"]).contains("--activations"), false)
     func store(_ v: String?, _ off: Bool) -> String? { SplashProcess.sanitizedStoreSize(v, allowOff: off) }
     check("store size: units, fractions and bytes all pass",
           [store("16G", true), store("2.5G", true), store("1200M", false), store("512K", false), store("12GB", true)].map { $0! },

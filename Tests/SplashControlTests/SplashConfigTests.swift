@@ -122,6 +122,17 @@ func storeSizesThatSplashRejects() {
   #expect(SplashProcess.sanitizedStoreSize("off", allowOff: false) == nil)
 }
 
+@Test("a chosen activation precision survives a save and a load")
+func activationsRoundTrips() throws {
+  var cfg = SplashConfig()
+  cfg.activations = "bf16"
+  let data = try JSONEncoder().encode(cfg)
+  let reloaded = try JSONDecoder().decode(SplashConfig.self, from: data)
+  #expect(reloaded.activations == "bf16")
+  let fresh = try JSONDecoder().decode(SplashConfig.self, from: JSONEncoder().encode(SplashConfig()))
+  #expect(fresh.activations == nil)
+}
+
 @Test("the 1.4.0 flags are gated on the probed binary like every other one")
 func streamingFlagsGate() {
   var cfg = SplashConfig()
