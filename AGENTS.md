@@ -166,7 +166,7 @@ make check    # script suites (core + agent-status)
 make test     # swift-testing suite (DTO mirror + app logic)
 make lint     # formatter gate (strict, zero warnings)
 make verify   # all hard gates: check + test + lint, every one green
-make scan     # security scan: semgrep + qlty + gitleaks, zero findings
+make scan     # security scan: semgrep + qlty + shellcheck + gitleaks, zero findings
 make app      # assemble dist/Splash.app
 ```
 

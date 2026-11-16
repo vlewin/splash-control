@@ -40,9 +40,10 @@ lint: ## formatter gate, zero warnings (strict)
 verify: ## all hard gates: check + test + lint, every one green
 	make check && make test && make lint
 
-scan: ## security scan: semgrep + qlty + gitleaks, mandatory before opening a PR
+scan: ## security scan: semgrep + qlty + shellcheck + gitleaks, mandatory before opening a PR
 	semgrep scan --config auto .
 	qlty check --sample 5
+	shellcheck Scripts/*.sh
 	gitleaks dir . --redact
 
 run: app ## quit, rebuild, relaunch from dist, show process path
