@@ -165,9 +165,24 @@ make build    # fast inner loop
 make check    # script suites (core + agent-status)
 make test     # swift-testing suite (DTO mirror + app logic)
 make lint     # formatter gate (strict, zero warnings)
+make fmt      # rewrite Sources with that same formatter
 make verify   # all hard gates: check + test + lint, every one green
+make scan     # security scan: semgrep + qlty + shellcheck + gitleaks (history and tree)
+make pre-pr   # fmt, then verify, then scan — the PR gate in one command
 make app      # assemble dist/Splash.app
 ```
+
+`make pre-pr` is the gate in one command (`fmt` first, because it rewrites what
+`lint` then checks). `make scan` is **mandatory before opening a pull request** (and before marking
+one ready). It runs `semgrep scan --config auto --error .`, `qlty check --sample 5`,
+`shellcheck Scripts/*.sh` and `gitleaks` over both history and working tree, needs
+`semgrep`, `qlty` and `gitleaks` on `PATH`
+(`brew install semgrep qlty gitleaks`; qlty reads the committed
+`.qlty/qlty.toml`), and takes a couple of minutes — the slow part is `semgrep`
+fetching its ruleset. A finding is new
+drift: fix it, or suppress that one line with a reason (`# nosec <id>` for
+bandit, `# nosemgrep` for semgrep) — never by widening the config or deleting a
+plugin.
 
 `make lint` is expected to be clean: the DTOs carry the server's snake_case JSON keys in explicit `CodingKeys` rather than in property names, so the formatter never fights the wire schema. Any warning it emits is new drift to fix, not a baseline to tolerate.
 
@@ -294,6 +309,7 @@ Reply with these eight sections, in this order. Do not reorder or omit:
 - Do not claim success from `swift build` alone — assemble, relaunch, observe.
 - Do not leave changes uncommitted upon completing a task.
 - Do not commit or merge unless `make verify` is green — check, test, lint, no exceptions.
+- Do not open a pull request before `make scan` is green (semgrep + qlty + gitleaks).
 - Do not commit on `main` — feature branches + PR; the agent may push its branch for review only with explicit user approval, and only a human merges to `main`. Direct or force-push to `main` needs explicit approval.
 - Do not report a change as visible until `dist/Splash.app` is rebuilt **and** relaunched.
 - Do not parse `splash serve` console lines for data `/status` provides.

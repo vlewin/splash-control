@@ -11,13 +11,16 @@ import time
 import urllib.request
 
 URL = "http://127.0.0.1:8000/status"
-OUT = sys.argv[1] if len(sys.argv) > 1 else "/tmp/splash-status-samples.jsonl"
+OUT = sys.argv[1] if len(sys.argv) > 1 else "/tmp/splash-status-samples.jsonl"  # nosec B108
 DURATION = int(sys.argv[2]) if len(sys.argv) > 2 else 60
 INTERVAL = 1.0
 
 def fetch():
     try:
-        with urllib.request.urlopen(URL, timeout=5) as r:
+        # The URL is this script's own constant (loopback, plain http because
+        # that is what `splash serve` binds); no user input reaches it.
+        # nosemgrep
+        with urllib.request.urlopen(URL, timeout=5) as r:  # nosec B310
             return json.load(r), None
     except Exception as e:
         return None, str(e)
