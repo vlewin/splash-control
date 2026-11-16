@@ -167,15 +167,19 @@ make test     # swift-testing suite (DTO mirror + app logic)
 make lint     # formatter gate (strict, zero warnings)
 make fmt      # rewrite Sources with that same formatter
 make verify   # all hard gates: check + test + lint, every one green
-make scan     # security scan: semgrep + qlty + shellcheck + gitleaks (history and tree), zero findings
+make scan     # security scan: semgrep + qlty + shellcheck + gitleaks (history and tree)
+make pre-pr   # fmt, then verify, then scan — the PR gate in one command
 make app      # assemble dist/Splash.app
 ```
 
-`make scan` is **mandatory before opening a pull request** (and before marking
-one ready). It runs `semgrep scan --config auto .`, `qlty check --sample 5` and
-`gitleaks dir . --redact`, needs `semgrep`, `qlty` and `gitleaks` on `PATH`
+`make pre-pr` is the gate in one command (`fmt` first, because it rewrites what
+`lint` then checks). `make scan` is **mandatory before opening a pull request** (and before marking
+one ready). It runs `semgrep scan --config auto --error .`, `qlty check --sample 5`,
+`shellcheck Scripts/*.sh` and `gitleaks` over both history and working tree, needs
+`semgrep`, `qlty` and `gitleaks` on `PATH`
 (`brew install semgrep qlty gitleaks`; qlty reads the committed
-`.qlty/qlty.toml`), and takes several minutes on first run. A finding is new
+`.qlty/qlty.toml`), and takes a couple of minutes — the slow part is `semgrep`
+fetching its ruleset. A finding is new
 drift: fix it, or suppress that one line with a reason (`# nosec <id>` for
 bandit, `# nosemgrep` for semgrep) — never by widening the config or deleting a
 plugin.

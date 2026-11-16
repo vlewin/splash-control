@@ -1,4 +1,4 @@
-.PHONY: help build app check test lint fmt verify scan run screenshot
+.PHONY: help build app check test lint fmt verify scan pre-pr run screenshot
 
 help: ## show targets
 	@grep -E '^[a-z]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-12s %s\n", $$1, $$2}'
@@ -51,6 +51,9 @@ scan: ## security scan: semgrep + qlty + shellcheck + gitleaks, mandatory before
 	# deleted (still leaked), the tree catches one in a file not yet committed.
 	gitleaks git . -v --redact
 	gitleaks dir . -v --redact
+
+pre-pr: ## everything a PR needs: fmt, then verify, then scan
+	make fmt && make verify && make scan
 
 run: app ## quit, rebuild, relaunch from dist, show process path
 	osascript -e 'quit app "Splash"' 2>/dev/null; sleep 1
