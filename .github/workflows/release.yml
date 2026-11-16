@@ -76,9 +76,11 @@ jobs:
           # Proves an intact assembly, not who assembled it.
           codesign --verify --deep --strict dist/Splash.app
 
+          # Asset names carry the tag verbatim ("v" included): the upload step
+          # and render-cask.sh both look for SplashControl-<tag>.zip.
           cd dist
-          zip -r "SplashControl-$EXPECTED.zip" Splash.app
-          shasum -a 256 "SplashControl-$EXPECTED.zip" > "SplashControl-$EXPECTED.zip.sha256"
+          zip -r "SplashControl-${{ steps.tag_version.outputs.new_tag }}.zip" Splash.app
+          shasum -a 256 "SplashControl-${{ steps.tag_version.outputs.new_tag }}.zip" > "SplashControl-${{ steps.tag_version.outputs.new_tag }}.zip.sha256"
 
       # Draft first: the tag is minted by the same API call that creates the
       # release, so a tag can never exist without one, and nothing is
