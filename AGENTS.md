@@ -165,6 +165,7 @@ make build    # fast inner loop
 make check    # script suites (core + agent-status)
 make test     # swift-testing suite (DTO mirror + app logic)
 make lint     # formatter gate (strict, zero warnings)
+make fmt      # rewrite Sources with that same formatter
 make verify   # all hard gates: check + test + lint, every one green
 make scan     # security scan: semgrep + qlty + shellcheck + gitleaks, zero findings
 make app      # assemble dist/Splash.app
