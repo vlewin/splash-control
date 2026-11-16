@@ -1,4 +1,4 @@
-.PHONY: help build app check test lint verify scan run screenshot
+.PHONY: help build app check test lint fmt verify scan run screenshot
 
 help: ## show targets
 	@grep -E '^[a-z]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-12s %s\n", $$1, $$2}'
@@ -37,11 +37,14 @@ test: ## swift-testing suite
 lint: ## formatter gate, zero warnings (strict)
 	xcrun swift-format lint --strict --recursive Sources
 
+fmt: ## rewrite Swift sources with the formatter (same rules make lint checks)
+	xcrun swift-format format --in-place --recursive Sources
+
 verify: ## all hard gates: check + test + lint, every one green
 	make check && make test && make lint
 
 scan: ## security scan: semgrep + qlty + shellcheck + gitleaks, mandatory before opening a PR
-	semgrep scan --config auto .
+	semgrep scan --config auto --error .
 	qlty check --sample 5
 	shellcheck Scripts/*.sh
 	gitleaks dir . --redact
