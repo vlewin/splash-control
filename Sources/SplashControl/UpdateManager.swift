@@ -77,6 +77,22 @@ final class UpdateManager: ObservableObject {
     return false
   }
 
+  /// Decides between "offer it" and "already have it" for a fetched release.
+  ///
+  /// `LastInstalledReleaseTag` records that a release was once *staged*, not
+  /// what is running now — so it may only short-circuit when the release is
+  /// not newer than the running bundle. Trusting it unconditionally makes a
+  /// downgraded or locally built copy report "Latest" forever.
+  nonisolated static func resolve(
+    candidate: ReleaseInfo, current: String, lastInstalledTag: String?
+  ) -> State {
+    let isNewer = isVersionNewer(candidate: candidate.version, than: current)
+    if candidate.tagName == lastInstalledTag && !isNewer {
+      return .upToDate(currentVersion: candidate.version)
+    }
+    return isNewer ? .updateAvailable(candidate) : .upToDate(currentVersion: current)
+  }
+
   /// Checks for available updates from GitHub Releases API.
   func checkForUpdates(silent: Bool = false) async {
     if case .downloading = state { return }
@@ -108,18 +124,11 @@ final class UpdateManager: ObservableObject {
 
       let current = SplashLog.version
       let lastInstalledTag = UserDefaults.standard.string(forKey: "LastInstalledReleaseTag")
-      if release.tagName == lastInstalledTag {
-        // Circuit breaker: This exact release was already installed on this machine
-        state = .upToDate(currentVersion: release.version)
-        SplashLog.shared.log("updater up_to_date_circuit_breaker tag=\(release.tagName)")
-      } else if Self.isVersionNewer(candidate: release.version, than: current) {
-        state = .updateAvailable(release)
-        SplashLog.shared.log(
-          "updater update_available version=\(release.version) current=\(current)")
-      } else {
-        state = .upToDate(currentVersion: current)
-        SplashLog.shared.log("updater up_to_date version=\(current)")
-      }
+      state = Self.resolve(
+        candidate: release, current: current, lastInstalledTag: lastInstalledTag)
+      SplashLog.shared.log(
+        "updater checked tag=\(release.tagName) current=\(current) newer=\(Self.isVersionNewer(candidate: release.version, than: current)) last_installed=\(lastInstalledTag ?? "none")"
+      )
     } catch {
       state = .failed(error.localizedDescription)
       SplashLog.shared.log("updater check_failed error=\(error)")

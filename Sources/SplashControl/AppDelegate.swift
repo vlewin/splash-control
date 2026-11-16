@@ -159,10 +159,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
       }
     }
 
-    // Unobtrusive update check 3 seconds after launch so startup remains instant
+    // Unobtrusive update check 3 seconds after launch so startup remains
+    // instant, then every 6 h: a tray app that only checks at launch never
+    // learns about a release until the user restarts it. 6 h is four calls a
+    // day, well under the unauthenticated 60/h GitHub API limit.
     Task {
       try? await Task.sleep(for: .seconds(3))
       await UpdateManager.shared.checkForUpdates(silent: true)
+      while true {
+        try? await Task.sleep(for: .seconds(6 * 3600))
+        await UpdateManager.shared.checkForUpdates(silent: true)
+      }
     }
   }
 

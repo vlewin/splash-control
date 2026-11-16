@@ -227,18 +227,16 @@ inherits a diff it cannot date.
   `docs:`, `refactor:`, `chore:`, `style:`, `test:`), body explains the why.
   One concern per commit.
 
-### Pre-merge version bump (release-bearing PRs only)
-- A PR is *release-bearing* if it contains `feat:`, `fix:`, or breaking (`!`) commits.
-- Before marking a release-bearing PR ready for review:
-  1. Confirm the branch is rebased on `main` (`merge-base == origin/main`).
-  2. Determine the bump from branch commits since the last tag (`breaking` → major, `feat:` → minor, `fix:` → patch; highest wins).
-  3. Update `CFBundleShortVersionString` in `Resources/Info.plist`; `CFBundleVersion`
-     is stamped by `Scripts/make-app.sh` at bundle assembly, never by the bump commit.
-  4. Commit as the final commit:
-     `chore(release): bump Info.plist to vX.Y.Z [skip-release]`
-- The `[skip-release]` literal and `chore:` type are mandatory so CI's `github-tag-action` does not double-bump.
-- Non-release PRs (`docs:`, `chore:`, `test:`, `refactor:` only) MUST NOT touch `Resources/Info.plist`.
-- If `main` gained a new release tag while the PR was in review: rebase, drop the stale bump commit, recompute the version, and re-commit.
+### The version comes from the tag, never from a PR
+- `CFBundleShortVersionString` is **not stored in the repository**. `Resources/Info.plist`
+  carries the placeholder `0.0.0-dev`; `Scripts/make-app.sh` is the only writer — CI
+  passes the minted tag, a local build stamps `git describe --tags --always`.
+- Never edit a version number in a PR, and never add a bump commit. `release.yml`
+  derives the tag from the merged commits' conventional prefixes (`fix:` patch,
+  `feat:` minor, `!` major; anything else mints nothing).
+- `CFBundleVersion` is stamped by `make-app.sh` too, so neither number is committed.
+- `Resources/Info.plist` changes only for a key that is not a version (e.g.
+  `LSMinimumSystemVersion`, `NSSomethingUsageDescription`).
 
 ## 12. Sources of truth
 
@@ -306,8 +304,8 @@ Reply with these eight sections, in this order. Do not reorder or omit:
 - Do not render an empty ring for "no data yet" — only for a down service.
 - Do not make two dot states differ only by blinking.
 - Do not put machine-specific paths, usernames or hardware in this file or any other reference doc.
-- Do not push version-bump commits directly to `main` (GH013). The bump lives in the PR branch.
-- Do not use `feat:` or `fix:` for a version bump commit; always use `chore(release): ... [skip-release]`.
+- Do not commit a release version into `Resources/Info.plist`; the tag owns it, `make-app.sh` stamps it.
+- Do not write `CFBundleShortVersionString` from anything except the tag (CI) or `git describe` (local).
 
 ### Ask first
 - SPM dependencies: none get added without explicit approval.

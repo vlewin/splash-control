@@ -59,3 +59,38 @@ func testCaskDetection() {
   #expect(!UpdateManager.detectCaskInstall(bundlePath: "/Applications/Splash.app"))
   #expect(UpdateManager.detectCaskInstall(bundlePath: "/opt/homebrew/Caskroom/splash-control/1.11.0/Splash.app"))
 }
+
+@Test("installed-tag breaker never masks a newer release")
+func testResolveUpdateState() {
+  let release = UpdateManager.ReleaseInfo(
+    tagName: "v1.18.0",
+    version: "1.18.0",
+    name: "Release v1.18.0",
+    body: "",
+    htmlURL: URL(string: "https://example.com/v1.18.0")!,
+    zipURL: URL(string: "https://example.com/v1.18.0.zip")!,
+    sha256URL: URL(string: "https://example.com/v1.18.0.zip.sha256")!
+  )
+
+  // The bug: a stale key must not hide a genuinely newer release.
+  #expect(
+    UpdateManager.resolve(candidate: release, current: "1.17.1", lastInstalledTag: "v1.18.0")
+      == .updateAvailable(release))
+  // The loop the breaker exists to stop: release already installed and running.
+  #expect(
+    UpdateManager.resolve(candidate: release, current: "1.18.0", lastInstalledTag: "v1.18.0")
+      == .upToDate(currentVersion: "1.18.0"))
+  // Same release, no key recorded (fresh install): version compare still wins.
+  #expect(
+    UpdateManager.resolve(candidate: release, current: "1.18.0", lastInstalledTag: nil)
+      == .upToDate(currentVersion: "1.18.0"))
+  // Local `git describe` build five commits past the tag: same base version.
+  #expect(
+    UpdateManager.resolve(
+      candidate: release, current: "1.18.0-5-gabc1234", lastInstalledTag: "v1.18.0")
+      == .upToDate(currentVersion: "1.18.0"))
+  // Older release than what is running: never offer a downgrade.
+  #expect(
+    UpdateManager.resolve(candidate: release, current: "1.19.0", lastInstalledTag: nil)
+      == .upToDate(currentVersion: "1.19.0"))
+}

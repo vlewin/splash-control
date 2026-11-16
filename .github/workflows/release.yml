@@ -57,43 +57,68 @@ jobs:
           default_bump: "false"
           release_branches: "main"
 
-      - name: Build Release Bundle
+      - name: Build and stamp the release bundle
         if: ${{ steps.tag_version.outputs.new_tag }}
         run: |
           bash Scripts/make-app.sh "${{ steps.tag_version.outputs.new_tag }}"
 
-          # Verify: fail the release if the built bundle's Info.plist does not match the tag
-          EXPECTED_VERSION="${{ steps.tag_version.outputs.new_tag }}"
-          EXPECTED_VERSION="${EXPECTED_VERSION#v}"
+          # The built bundle is the only place the version is written, so it is
+          # the only thing worth checking. Resources/Info.plist is a placeholder.
+          EXPECTED="${{ steps.tag_version.outputs.new_tag }}"
+          EXPECTED="${EXPECTED#v}"
           STAMPED=$(defaults read "$PWD/dist/Splash.app/Contents/Info.plist" CFBundleShortVersionString)
-          if [ "$STAMPED" != "$EXPECTED_VERSION" ]; then
-            echo "::error::Release version mismatch: bundle has '$STAMPED', expected '$EXPECTED_VERSION'"
+          if [ "$STAMPED" != "$EXPECTED" ]; then
+            echo "::error::Release version mismatch: bundle has '$STAMPED', expected '$EXPECTED'"
             exit 1
           fi
 
-          # Verify: fail the release if the repo's Resources/Info.plist does not match the tag
-          REPO_VERSION=$(defaults read "$PWD/Resources/Info.plist" CFBundleShortVersionString)
-          if [ "$REPO_VERSION" != "$EXPECTED_VERSION" ]; then
-            echo "::error::Release version mismatch: Resources/Info.plist has '$REPO_VERSION', expected '$EXPECTED_VERSION'"
-            exit 1
-          fi
+          # Structural only: the ad-hoc seal matches the files in the bundle.
+          # Proves an intact assembly, not who assembled it.
+          codesign --verify --deep --strict dist/Splash.app
 
+          # Asset names carry the tag verbatim ("v" included): the upload step
+          # and render-cask.sh both look for SplashControl-<tag>.zip.
           cd dist
           zip -r "SplashControl-${{ steps.tag_version.outputs.new_tag }}.zip" Splash.app
           shasum -a 256 "SplashControl-${{ steps.tag_version.outputs.new_tag }}.zip" > "SplashControl-${{ steps.tag_version.outputs.new_tag }}.zip.sha256"
 
-      - name: Create GitHub Release
+      # Draft first: the tag is minted by the same API call that creates the
+      # release, so a tag can never exist without one, and nothing is
+      # immutable until publish.
+      - name: Create draft release
         if: ${{ steps.tag_version.outputs.new_tag }}
-        uses: softprops/action-gh-release@v3
-        with:
-          tag_name: ${{ steps.tag_version.outputs.new_tag }}
-          name: Release ${{ steps.tag_version.outputs.new_tag }}
-          body: ${{ steps.tag_version.outputs.changelog }}
-          files: |
-            dist/SplashControl-${{ steps.tag_version.outputs.new_tag }}.zip
-            dist/SplashControl-${{ steps.tag_version.outputs.new_tag }}.zip.sha256
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.tag_version.outputs.new_tag }}
+          CHANGELOG: ${{ steps.tag_version.outputs.changelog }}
+        run: |
+          gh release create "$TAG" --draft \
+            --target "$GITHUB_SHA" \
+            --title "Release $TAG" \
+            --notes "$CHANGELOG"
+
+      - name: Upload assets and verify what a user would download
+        if: ${{ steps.tag_version.outputs.new_tag }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.tag_version.outputs.new_tag }}
+        run: |
+          gh release upload "$TAG" \
+            "dist/SplashControl-$TAG.zip" \
+            "dist/SplashControl-$TAG.zip.sha256" \
+            --clobber
+          rm -rf verify-assets && mkdir verify-assets
+          gh release download "$TAG" --dir verify-assets
+          ( cd verify-assets && shasum -a 256 -c "SplashControl-$TAG.zip.sha256" )
+
+      # Publishing is the point of no return: from here the tag is locked and
+      # /releases/latest starts returning it, which is what the app polls.
+      - name: Publish release
+        if: ${{ steps.tag_version.outputs.new_tag }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.tag_version.outputs.new_tag }}
+        run: gh release edit "$TAG" --draft=false --latest
 
       - name: Publish Homebrew cask
         if: ${{ steps.tag_version.outputs.new_tag }}
