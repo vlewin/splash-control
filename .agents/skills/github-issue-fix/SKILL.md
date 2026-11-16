@@ -72,18 +72,12 @@ only with explicit user approval.
    - breaking: `fix!` / `feat!`
    - CI/docs/templates/meta: `chore: [skip-release]`
    - **`[skip-release]` only when the commit ships no changed bytes.**
-11. **Version bump** (`Resources/Info.plist`, PR-ready only):
-    - Confirm branch is rebased on `main` (`merge-base == origin/main`).
-    - Check branch commits since the last tag on `main`:
-      - Has breaking (`!`) → bump MAJOR
-      - Has `feat:` → bump MINOR
-      - Has `fix:` → bump PATCH
-      - Only `docs:`/`chore:`/`test:`/`refactor:` → DO NOT touch `Resources/Info.plist`.
-    - If release-bearing, update `CFBundleShortVersionString` in `Resources/Info.plist`
-      (`CFBundleVersion` is stamped by `Scripts/make-app.sh` at bundle assembly) and
-      commit as the final commit:
-      `chore(release): bump Info.plist to vX.Y.Z [skip-release]`
-    - Include expected release tag in PR description.
+11. **Version**: do not touch it. `Resources/Info.plist` stays at the `0.0.0-dev`
+    placeholder — `Scripts/make-app.sh` stamps the real version at bundle
+    assembly (the tag in CI, `git describe` locally). Confirm the branch is
+    rebased on `main`, compute the *expected* tag from the branch commits
+    (`!` MAJOR, `feat:` MINOR, `fix:` PATCH, everything else mints nothing) and
+    put that in the PR description. A version-bump commit in a PR is a defect.
 12. **PR.** Description: issue link, root cause, verification evidence (test name /
     screenshot / live probe), gate results, expected release class. End with
     `Fixes #N` so the issue auto-closes. Evidence is text in the body — gate
@@ -109,10 +103,8 @@ releases a week become real noise.
 
 ## Hard rules
 
-- The pipeline mints **tags** from conventional commits — for release-bearing PRs,
-  the agent sets Info.plist to match via a final `chore(release): ... [skip-release]`
-  commit before review.
-- Never push version bumps to `main` (GH013). The bump lives in the PR branch.
+- The pipeline mints **tags** from conventional commits; the tag alone carries the
+  version into the bundle. No PR edits a version number.
 - A changed `dist/Splash.app` is the only truth for UI claims: unrelaunched = unverified.
 - Uncommitted changes at task end are a trap for the next session — commit or ask.
 - No secrets, no tokens, no machine-specific paths in commits, PRs, or issue comments
