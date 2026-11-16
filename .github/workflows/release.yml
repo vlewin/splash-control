@@ -19,9 +19,12 @@ jobs:
     runs-on: macos-26
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        # Pinned to a commit: a mutable tag can be repointed at new code.
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           fetch-depth: 0
+          # The release job never pushes this repo; the tap push uses TAP_TOKEN.
+          persist-credentials: false
 
       - name: Run checks (fixture-driven, no splash server needed)
         run: |
@@ -40,7 +43,7 @@ jobs:
 
       - name: Calculate version from Conventional Commits
         id: tag_version
-        uses: mathieudutour/github-tag-action@v7
+        uses: mathieudutour/github-tag-action@af99e60ce8132224b8e6ebab5023449fe256ed46 # v7
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           # Not "angular": v7 bundles conventional-changelog-angular 5, whose
@@ -59,13 +62,14 @@ jobs:
 
       - name: Build and stamp the release bundle
         if: ${{ steps.tag_version.outputs.new_tag }}
+        env:
+          TAG: ${{ steps.tag_version.outputs.new_tag }}
         run: |
-          bash Scripts/make-app.sh "${{ steps.tag_version.outputs.new_tag }}"
+          bash Scripts/make-app.sh "$TAG"
 
           # The built bundle is the only place the version is written, so it is
           # the only thing worth checking. Resources/Info.plist is a placeholder.
-          EXPECTED="${{ steps.tag_version.outputs.new_tag }}"
-          EXPECTED="${EXPECTED#v}"
+          EXPECTED="${TAG#v}"
           STAMPED=$(defaults read "$PWD/dist/Splash.app/Contents/Info.plist" CFBundleShortVersionString)
           if [ "$STAMPED" != "$EXPECTED" ]; then
             echo "::error::Release version mismatch: bundle has '$STAMPED', expected '$EXPECTED'"
@@ -79,8 +83,8 @@ jobs:
           # Asset names carry the tag verbatim ("v" included): the upload step
           # and render-cask.sh both look for SplashControl-<tag>.zip.
           cd dist
-          zip -r "SplashControl-${{ steps.tag_version.outputs.new_tag }}.zip" Splash.app
-          shasum -a 256 "SplashControl-${{ steps.tag_version.outputs.new_tag }}.zip" > "SplashControl-${{ steps.tag_version.outputs.new_tag }}.zip.sha256"
+          zip -r "SplashControl-$TAG.zip" Splash.app
+          shasum -a 256 "SplashControl-$TAG.zip" > "SplashControl-$TAG.zip.sha256"
 
       # Draft first: the tag is minted by the same API call that creates the
       # release, so a tag can never exist without one, and nothing is
@@ -128,8 +132,8 @@ jobs:
         # without it the step renders the cask and skips the push.
         run: |
           # From the repo root: render-cask.sh writes dist/<tag>.cask itself.
-          SHA256=$(cut -d ' ' -f1 "dist/SplashControl-${{ steps.tag_version.outputs.new_tag }}.zip.sha256")
-          bash Scripts/render-cask.sh "${{ steps.tag_version.outputs.new_tag }}" "$SHA256"
+          SHA256=$(cut -d ' ' -f1 "dist/SplashControl-$TAG.zip.sha256")
+          bash Scripts/render-cask.sh "$TAG" "$SHA256"
           if [[ -z "${TAP_TOKEN:-}" ]]; then
             echo "::warning::TAP_TOKEN is not set — rendered the cask but did not publish it."
             echo "To enable: 1) create https://github.com/vlewin/tap (public),"
@@ -146,7 +150,7 @@ jobs:
           brew trust --tap vlewin/tap
           TAPDIR="$(brew --repo vlewin/tap)"
           mkdir -p "$TAPDIR/Casks"
-          cp "dist/SplashControl-${{ steps.tag_version.outputs.new_tag }}.cask" "$TAPDIR/Casks/splash-control.rb"
+          cp "dist/SplashControl-$TAG.cask" "$TAPDIR/Casks/splash-control.rb"
           brew audit --strict vlewin/tap/splash-control
           git -C "$TAPDIR" config user.name "github-actions[bot]"
           git -C "$TAPDIR" config user.email "github-actions[bot]@users.noreply.github.com"
@@ -155,9 +159,9 @@ jobs:
           git -C "$TAPDIR" checkout -B main origin/main 2>/dev/null || true
           git -C "$TAPDIR" add Casks/splash-control.rb
           if git -C "$TAPDIR" diff --cached --quiet; then
-            echo "Cask already at ${{ steps.tag_version.outputs.new_tag }}; nothing to push."
+            echo "Cask already at $TAG; nothing to push."
           else
-            git -C "$TAPDIR" commit -m "splash-control: ${{ steps.tag_version.outputs.new_tag }}"
+            git -C "$TAPDIR" commit -m "splash-control: $TAG"
             # Pull with rebase to ensure clean linear history, then push with retry
             pushed=false
             for attempt in 1 2 3; do
@@ -175,4 +179,5 @@ jobs:
             fi
           fi
         env:
+          TAG: ${{ steps.tag_version.outputs.new_tag }}
           TAP_TOKEN: ${{ secrets.TAP_TOKEN }}

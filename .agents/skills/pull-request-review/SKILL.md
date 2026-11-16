@@ -19,7 +19,9 @@ Scope:
   or `Fixes: none` when no issue exists.
 
 Correctness:
-- `make verify` green on Swift tools 5.10 (check + test + lint, every one).
+- `make verify` green on Swift tools 5.10 (check + test + lint, every one), and
+  `make scan` green (semgrep + qlty + gitleaks, zero findings — re-run it on the
+  PR branch, do not trust a run from before the last commit).
 - Changed behavior covered by a regression test in the matching layer
   (`SplashControlKitTests` for kit/DTO, `SplashControlTests` for app logic,
   `lint:` pin + screenshot for layout a unit test cannot reach). A regression

@@ -9,7 +9,8 @@ Project: Splash Control — public GitHub repo, macOS menu-bar app (Swift, zero 
 SPM deps) controlling the local `splash` LLM server at 127.0.0.1. The runtime lives
 in a separate repo (`incoai/splash`) — never edit it from here.
 
-Gates: `make verify` (check + test + lint) · `make app` (assembles `dist/Splash.app`) ·
+Gates: `make verify` (check + test + lint) · `make scan` (semgrep + qlty +
+gitleaks; mandatory before the PR) · `make app` (assembles `dist/Splash.app`) ·
 `make screenshot VIEW=live|metrics|stats|logs|settings|info` ·
 `make run` (quit, rebuild, relaunch from dist, show process path).
 
@@ -66,6 +67,9 @@ only with explicit user approval.
    running copy → relaunch `dist/Splash.app` → confirm the live process path is the
    dist bundle, not `.build/` → `make screenshot` for every touched view → inspect
    the PNG. Never build from a dirty tree; never trust a stale bundle.
+   `make scan` must be green before step 12 — it is the pre-PR gate, not part of
+   `make verify` (it needs `semgrep`, `qlty`, `gitleaks` and network for the rule
+   registry).
 10. **Commits** — one concern per commit, conventional type, for humans (they become
    the changelog):
    - behavior: `fix:` / `feat:`
