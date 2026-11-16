@@ -1,4 +1,4 @@
-.PHONY: help build app check test lint verify run screenshot
+.PHONY: help build app check test lint verify scan run screenshot
 
 help: ## show targets
 	@grep -E '^[a-z]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-12s %s\n", $$1, $$2}'
@@ -39,6 +39,11 @@ lint: ## formatter gate, zero warnings (strict)
 
 verify: ## all hard gates: check + test + lint, every one green
 	make check && make test && make lint
+
+scan: ## security scan: semgrep + qlty + gitleaks, mandatory before opening a PR
+	semgrep scan --config auto .
+	qlty check --sample 5
+	gitleaks dir . --redact
 
 run: app ## quit, rebuild, relaunch from dist, show process path
 	osascript -e 'quit app "Splash"' 2>/dev/null; sleep 1
