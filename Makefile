@@ -47,7 +47,10 @@ scan: ## security scan: semgrep + qlty + shellcheck + gitleaks, mandatory before
 	semgrep scan --config auto --error .
 	qlty check --sample 5
 	shellcheck Scripts/*.sh
-	gitleaks dir . --redact
+	# Two different surfaces: history catches a secret that was committed then
+	# deleted (still leaked), the tree catches one in a file not yet committed.
+	gitleaks git . -v --redact
+	gitleaks dir . -v --redact
 
 run: app ## quit, rebuild, relaunch from dist, show process path
 	osascript -e 'quit app "Splash"' 2>/dev/null; sleep 1
