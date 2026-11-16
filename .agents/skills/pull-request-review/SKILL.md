@@ -38,6 +38,13 @@ Gates (in order):
   When no view changed, state that explicitly instead of attaching a screenshot.
   For process-only changes, cite `git diff --stat` and `git diff --check` as
   the byte-free evidence.
+- Maintainer rewrite of a contributor branch (rebase to clear a conflict): only
+  when the PR allows maintainer edits, only with `--force-with-lease` pinned to
+  the head actually reviewed, and never once the head has moved since. The
+  review then opens with old → new SHA, why, what survived (commits,
+  authorship), and the author's recovery command
+  (`git fetch && git reset --hard <fork>/<branch>`) — GitHub does not tell them
+  their branch history changed.
 
 Release:
 - Commit prefixes predict the tag (`feat!`/`fix!` = major, `feat` = minor,
@@ -52,6 +59,10 @@ Release:
 - PR does not push `main` or mint tags out of band.
 
 Hygiene (public repo):
+- Read the PR body *and* its comment thread before judging: a linked
+  verification comment is part of the PR. `gh pr view N --comments` covers
+  issue comments, `gh api repos/{owner}/{repo}/pulls/N/comments` inline review
+  comments, `pulls/N/reviews` the review bodies.
 - Review the full diff and PR text; sampling is not sufficient. No secrets,
   tokens, signing identities, machine-specific paths, usernames, or private
   URLs in commits, diffs, PR text, or comments. Here, “usernames” means a
@@ -65,3 +76,7 @@ Hygiene (public repo):
 Verdict first: ready / ready-with-nits / not-ready. Then per-group pass/fail
 with evidence (gate output, test name, screenshot, probe). File nits as
 follow-ups, never silently expand the PR. End with the expected release class.
+
+Close with readiness and the tag, never with merge authority:
+"Ready to merge; merging tags vX.Y.Z." A contributor cannot merge in this
+repo, so the review never hands them that line.
