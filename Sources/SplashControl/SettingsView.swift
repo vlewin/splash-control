@@ -882,6 +882,28 @@ struct SettingsView: View {
           .frame(width: 190 * uiScale, alignment: .trailing)
         }
 
+        formRow(
+          "Activations", "GPU activation precision · auto = INT8 where it is faster",
+          help:
+            "Passed as --activations. auto rounds activations to 8 bits where the GPU multiplies them twice as fast (M5 and later) — about a quarter off the first token, with a small numeric cost; bf16 keeps every activation bf16 for runs comparable with 1.6.0. splash 1.6.1+."
+        ) {
+          Picker(
+            "",
+            selection: Binding(
+              get: { config.config.activations ?? "auto" },
+              set: { config.config.activations = $0 == "auto" ? nil : $0 }
+            )
+          ) {
+            Text("Auto (Default)").tag("auto")
+            Text("bf16 (Parity)").tag("bf16")
+          }
+          .pickerStyle(.menu)
+          .controlSize(uiScale.zoomedControlSize(base: .regular))
+          .font(f(size: 13))
+          .labelsHidden()
+          .frame(width: 190 * uiScale, alignment: .trailing)
+        }
+
         Divider().opacity(0.4)
 
         toggleRow(

@@ -43,6 +43,11 @@ struct SplashConfig: Codable, Equatable {
   /// splash 1.4.0+). "auto" is faster but a MoE model's output then differs from
   /// run to run; "all" repeats. Closed set, like `reasoningEffort`.
   var verifyRows: String? = nil
+  /// Activation precision (`splash serve --activations`, splash 1.6.1+).
+  /// nil = auto: INT8 where the GPU multiplies 8-bit twice as fast (M5 and
+  /// later), bf16 everywhere else. "bf16" keeps every activation bf16, which is
+  /// what a run comparable to 1.6.0 needs. Closed set, like `verifyRows`.
+  var activations: String? = nil
   var noWebUI: Bool = false
   /// Skip vision preparation and loading (`splash serve --language-only`)
   var languageOnly: Bool = false
@@ -108,6 +113,9 @@ struct SplashConfig: Codable, Equatable {
 
   /// Closed value set for `--verify-rows`, from `serve --help`.
   static let verifyRowsValues = ["auto", "all"]
+
+  /// Closed value set for `--activations`, from `serve --help`.
+  static let activationsValues = ["auto", "bf16"]
 
   /// Closed value set for `dashboardScale`, in percent. Ordered for the menu.
   static let dashboardScaleValues = [100, 125, 150, 175, 200]
@@ -183,7 +191,7 @@ struct SplashConfig: Codable, Equatable {
       pollIntervalSec,
       windowMinutes,
       persistentCache, idleRelease,
-      expertMemory, pleMemory, sparseKvMemory, verifyRows
+      expertMemory, pleMemory, sparseKvMemory, verifyRows, activations
   }
 
   /// Tolerant decode: every field falls back to the default when the key is
@@ -208,6 +216,7 @@ struct SplashConfig: Codable, Equatable {
     sparseKvMemory =
       try c.decodeIfPresent(String.self, forKey: .sparseKvMemory) ?? d.sparseKvMemory
     verifyRows = try c.decodeIfPresent(String.self, forKey: .verifyRows) ?? d.verifyRows
+    activations = try c.decodeIfPresent(String.self, forKey: .activations) ?? d.activations
     noWebUI = try c.decodeIfPresent(Bool.self, forKey: .noWebUI) ?? d.noWebUI
     languageOnly = try c.decodeIfPresent(Bool.self, forKey: .languageOnly) ?? d.languageOnly
     disableAne = try c.decodeIfPresent(Bool.self, forKey: .disableAne) ?? d.disableAne

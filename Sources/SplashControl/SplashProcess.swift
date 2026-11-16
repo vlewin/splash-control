@@ -183,6 +183,7 @@ final class SplashProcess: ObservableObject {
     "--persistent-cache", "--idle-release", "--served-model-name", "--announce-served-name",
     "--default-reasoning-effort", "--disable-ane", "--state-format", "--allow-idle-sleep",
     "--expert-memory", "--ple-memory", "--sparse-kv-memory", "--verify-rows",
+    "--activations",
   ]
 
   /// Fills `serveFlags` from the binary about to be exec'd. Runs once per spawn
@@ -213,6 +214,7 @@ final class SplashProcess: ObservableObject {
     if let v = config.pleMemory, !v.isEmpty { want.append("--ple-memory") }
     if let v = config.sparseKvMemory, !v.isEmpty { want.append("--sparse-kv-memory") }
     if let v = config.verifyRows, !v.isEmpty { want.append("--verify-rows") }
+    if let a = config.activations, !a.isEmpty { want.append("--activations") }
     return want.filter { serveFlags.contains($0) }
   }
 
@@ -379,6 +381,12 @@ final class SplashProcess: ObservableObject {
       supports.contains("--verify-rows")
     {
       args += ["--verify-rows", rows]
+    }
+    if let acts = cfg.activations?.trimmingCharacters(in: .whitespaces).lowercased(),
+      SplashConfig.activationsValues.contains(acts),
+      supports.contains("--activations")
+    {
+      args += ["--activations", acts]
     }
     if let extra = cfg.extraArgs, !extra.isEmpty {
       args += extra.split(whereSeparator: { $0 == " " || $0 == "\t" }).map(String.init)

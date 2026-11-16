@@ -155,6 +155,15 @@ func status160FixtureDecodes() throws {
   #expect(parts["rest"] != nil)
 }
 
+@Test("1.6.1 capture decodes on the schema-8 DTO")
+func status161FixtureDecodes() throws {
+  let s = try JSONDecoder().decode(StatusDTO.self, from: try fixture("status_schema8_1_6_1.json"))
+  #expect(s.ready == true)
+  #expect(s.kvSpill?.spillMoves != nil)
+  #expect(s.warmup?.prefill2048 == true)
+  #expect(s.reasoningSwitch != nil)
+}
+
 @Test("1.4.1 windowed layout decodes kv.window")
 func status141WindowDecodes() throws {
   let json = """
