@@ -1,6 +1,7 @@
-# Keeps the default rules, but keeps `gitleaks dir .` off build output: .build/
-# and dist/ are generated and gitignored, so nothing there can be committed, and
-# walking them is the whole cost of the scan (303 MB -> 3.3 MB, 10 s -> 0.4 s).
+# Keeps the default rules, but keeps `gitleaks dir .` off build output: .build/,
+# dist/ and strix_runs/ are generated and gitignored, so nothing there can be
+# committed, and walking them is the whole cost of the scan
+# (303 MB -> 3.3 MB, 10 s -> 0.4 s).
 # Verified: a planted token in Scripts/ is still reported.
 [extend]
 useDefault = true
@@ -9,4 +10,5 @@ useDefault = true
 paths = [
   '''\.build/.*''',
   '''dist/.*''',
+  '''strix_runs/.*''',
 ]
