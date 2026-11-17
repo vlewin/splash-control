@@ -953,13 +953,23 @@ check("languageOnly survives a save/load round-trip",
            "--max-context", "64K", "--kv-format", "bf16", "--max-cache-disk", "5G",
            "--allowed-host", "mymac.local", "--allowed-host", "other.local",
            "--max-request-size", "64M", "--max-image-pixels", "1048576",
-           "--api-key", "secret", "--no-webui"])
+           "--no-webui"])
+
+    // The key must travel in the environment, not on argv: `ps` shows argv to
+    // every local account, the environment only to its owner.
+    let env = SplashProcess.buildLaunchEnvironment(c, base: ["PATH": "/usr/bin"])
+    check("api key rides in the environment", env["SPLASH_API_KEY"] ?? "", "secret")
+    checkNil("api key is never on argv",
+             SplashProcess.buildLaunchArgs(c).firstIndex(of: "--api-key"))
+    checkNil("no key configured, no environment entry",
+             SplashProcess.buildLaunchEnvironment(SplashConfig(), base: [:])["SPLASH_API_KEY"])
+    check("PATH widened, inherited tail kept", env["PATH"]?.hasSuffix(":/usr/bin") ?? false, true)
 
     // Every flag the app emits must exist in the installed splash. Verified
     // against `splash serve --help` on 1.1.0.
     let known: Set<String> = ["--model", "--port", "--max-memory", "--max-context",
       "--kv-format", "--max-cache-disk", "--allowed-host", "--max-request-size",
-      "--max-image-pixels", "--api-key", "--no-webui", "--language-only"]
+      "--max-image-pixels", "--no-webui", "--language-only"]
     var a = SplashConfig()
     a.extraArgs = "--language-only"
     var emitted: Set<String> = []

@@ -20,6 +20,14 @@ __pycache__/
 # Unfiled upstream issue drafts: local working material, not repo content.
 issues/
 
+# Local tool artifacts: generated on this machine, never repo content. Each tool
+# also writes its own .gitignore; this list covers a rebuild that does not.
+# `.qlty/` stays out on purpose — it holds committed config that its own
+# .gitignore un-ignores by negation, which a directory rule here would break.
+.codegraph/
+.ruff_cache/
+strix_runs/
+
 # Compiled on demand by screenshot.sh from find-window-id.swift. Committing
 # the binary would break the cross-architecture portability it exists for.
 Scripts/find-window-id

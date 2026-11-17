@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import SwiftUI
 
 /// The tray's own log and the server's log, side by side, filterable.

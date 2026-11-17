@@ -761,7 +761,7 @@ struct SettingsView: View {
         formRow(
           "API Key", "Bearer token for client authentication · blank = none",
           help:
-            "Sent as --api-key. Clients must send the same value; blank allows local loopback without a token."
+            "Sent through SPLASH_API_KEY. Clients must send the same value; blank allows local loopback without a token."
         ) {
           TextField(
             "Optional",
