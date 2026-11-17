@@ -245,6 +245,21 @@ final class SplashProcess: ObservableObject {
   /// so the server's own defaults (SPLASH_PORT, SPLASH_API_KEY, …) apply.
   var launchArgs: [String] { Self.buildLaunchArgs(config, supports: serveFlags) }
 
+  /// The environment the child gets: PATH widened for a GUI launch (launchd
+  /// hands apps a minimal one), plus the API key. The key travels here and not
+  /// on argv, which `ps` shows to every account on the machine.
+  nonisolated static func buildLaunchEnvironment(
+    _ cfg: SplashConfig, base: [String: String] = ProcessInfo.processInfo.environment
+  ) -> [String: String] {
+    var env = base
+    let inherited = env["PATH"] ?? ""
+    env["PATH"] =
+      "/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+      + (inherited.isEmpty ? "" : ":\(inherited)")
+    if let k = cfg.apiKey, !k.isEmpty { env["SPLASH_API_KEY"] = k }
+    return env
+  }
+
   /// Whether the probed binary accepts `--disable-ane` (splash 1.3.0+).
   var supportsDisableAne: Bool { serveFlags.contains("--disable-ane") }
 
@@ -288,6 +303,7 @@ final class SplashProcess: ObservableObject {
   /// The exact `splash serve` command line for a config. Pure in `cfg`, so it
   /// is `static` and internal: Scripts/check_core.sh asserts it, because a
   /// wrong flag here is invisible until the server refuses to start.
+  /// The API key is deliberately absent: it travels in the environment.
   nonisolated static func buildLaunchArgs(
     _ cfg: SplashConfig, supports: Set<String> = []
   ) -> [String] {
@@ -308,7 +324,6 @@ final class SplashProcess: ObservableObject {
     }
     if let r = cfg.maxRequestSize, !r.isEmpty { args += ["--max-request-size", r] }
     if let p = cfg.maxImagePixels, !p.isEmpty { args += ["--max-image-pixels", p] }
-    if let k = cfg.apiKey, !k.isEmpty { args += ["--api-key", k] }
     if cfg.noWebUI { args += ["--no-webui"] }
     if cfg.languageOnly { args += ["--language-only"] }
     // Gated flags: a release predating them rejects the flag outright, and
@@ -508,11 +523,7 @@ final class SplashProcess: ObservableObject {
     proc.arguments = args
     // GUI apps inherit a minimal PATH (launchd); ensure Homebrew + standard
     // dirs are visible so the `splash` launcher can find its Python runtime.
-    var env = ProcessInfo.processInfo.environment
-    let inherited = env["PATH"] ?? ""
-    env["PATH"] =
-      "/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
-      + (inherited.isEmpty ? "" : ":\(inherited)")
+    let env = Self.buildLaunchEnvironment(config)
     proc.environment = env
     let pipe = Pipe()
     proc.standardOutput = pipe
