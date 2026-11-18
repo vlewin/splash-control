@@ -1,4 +1,4 @@
-.PHONY: help build app check test lint fmt verify scan pre-pr run screenshot
+.PHONY: help build app check test lint fmt verify scan scan-rules pre-pr run screenshot
 
 help: ## show targets
 	@grep -E '^[a-z]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-12s %s\n", $$1, $$2}'
@@ -44,13 +44,10 @@ verify: ## all hard gates: check + test + lint, every one green
 	make check && make test && make lint
 
 scan: ## security scan: semgrep + qlty + shellcheck + gitleaks, mandatory before opening a PR
-	semgrep scan --config auto --error .
-	qlty check --sample 5
-	shellcheck Scripts/*.sh
-	# Two different surfaces: history catches a secret that was committed then
-	# deleted (still leaked), the tree catches one in a file not yet committed.
-	gitleaks git . -v --redact
-	gitleaks dir . -v --redact
+	bash Scripts/scan.sh
+
+scan-rules: ## print the current semgrep registry ruleset sha256 (update the pin)
+	bash Scripts/scan.sh --refresh
 
 pre-pr: ## everything a PR needs: fmt, then verify, then scan
 	make fmt && make verify && make scan
