@@ -40,3 +40,79 @@ jobs:
         run: |
           swift --version
           swift test
+
+  lint:
+    name: Formatter (strict)
+    runs-on: macos-26
+    steps:
+      - name: Checkout code
+        # Pinned to a commit: a mutable tag can be repointed at new code.
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      # Exactly the developer's gate: Xcode's swift-format. The Linux Swift
+      # toolchain is the other option, but then the formatter that fails CI is
+      # not the one `make fmt` rewrites with locally.
+      - name: Check formatting
+        run: make lint
+
+  scan:
+    name: Security Scan
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout code
+        # Pinned to a commit: a mutable tag can be repointed at new code.
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          # gitleaks scans every commit; a shallow clone would hide a secret
+          # that was committed and deleted again.
+          fetch-depth: 0
+          persist-credentials: false
+
+      # None of these four ship on the runner image. Restoring them is the only
+      # reason a warm run is fast, so the key names every pinned version: bump
+      # one and the next run reinstalls from scratch.
+      - name: Restore pinned scanners
+        id: scanners
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.local
+            ~/.qlty
+          key: scanners-semgrep-1.185.0-qlty-0.671.0-gitleaks-8.30.1-shellcheck-0.11.0
+
+      - name: Install pinned scanners
+        if: steps.scanners.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          bin="$HOME/.local/bin"
+          dl="$RUNNER_TEMP/dl"
+          mkdir -p "$bin" "$dl"
+
+          # sha256 of the exact asset: a release tag can be repointed, the bytes
+          # cannot change without the check failing.
+          curl -fsSL --retry 3 -o "$dl/gitleaks.tar.gz" \
+            https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz
+          echo "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  $dl/gitleaks.tar.gz" | sha256sum --check
+          tar -xzf "$dl/gitleaks.tar.gz" -C "$bin" gitleaks
+
+          curl -fsSL --retry 3 -o "$dl/shellcheck.tar.gz" \
+            https://github.com/koalaman/shellcheck/releases/download/v0.11.0/shellcheck-v0.11.0.linux.x86_64.tar.gz
+          echo "b7af85e41cc99489dcc21d66c6d5f3685138f06d34651e6d34b42ec6d54fe6f6  $dl/shellcheck.tar.gz" | sha256sum --check
+          tar -xzf "$dl/shellcheck.tar.gz" -C "$bin" --strip-components=1 shellcheck-v0.11.0/shellcheck
+
+          curl -fsSL --retry 3 -o "$dl/qlty.tar.xz" \
+            https://github.com/qltysh/qlty/releases/download/v0.671.0/qlty-x86_64-unknown-linux-gnu.tar.xz
+          echo "de6576e0800883dd66456e374042034fa7fca845a48865aae49ae139b4472311  $dl/qlty.tar.xz" | sha256sum --check
+          tar -xJf "$dl/qlty.tar.xz" -C "$bin" --strip-components=1 qlty-x86_64-unknown-linux-gnu/qlty
+
+          # The engine and its semgrep-core binary arrive in one wheel.
+          pipx install "semgrep==1.185.0"
+
+      - name: Put scanners on PATH
+        run: echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      # Same script `make scan` runs locally; the other tools come from here too.
+      - name: Run security scan
+        run: bash Scripts/scan.sh

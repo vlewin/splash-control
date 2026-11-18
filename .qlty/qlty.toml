@@ -61,33 +61,18 @@ name = "default"
 default = true
 
 
+# Only the plugins this repo needs: actionlint and zizmor read the workflows,
+# ruff reads Scripts/sample_status.py. shellcheck and gitleaks run standalone in
+# Scripts/scan.sh; radarlint-python pulled a JDK plus Sonar rule packs to never
+# fail a comment-only check of that one file.
 [[plugin]]
 name = "actionlint"
-
-[[plugin]]
-name = "bandit"
-
-[[plugin]]
-name = "radarlint-python"
-mode = "comment"
-
-[[plugin]]
-name = "ripgrep"
-# Its only rule here matches the word "BUG" in prose comments (bug numbers in
-# check_agent_status.sh and SplashProcess.swift); nothing actionable.
-mode = "disabled"
 
 [[plugin]]
 name = "ruff"
 drivers = [
   "lint",
 ]
-
-[[plugin]]
-name = "shellcheck"
-
-[[plugin]]
-name = "trufflehog"
 
 [[plugin]]
 name = "zizmor"

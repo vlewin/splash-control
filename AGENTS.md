@@ -168,21 +168,27 @@ make lint     # formatter gate (strict, zero warnings)
 make fmt      # rewrite Sources with that same formatter
 make verify   # all hard gates: check + test + lint, every one green
 make scan     # security scan: semgrep + qlty + shellcheck + gitleaks (history and tree)
+make scan-rules # re-download the semgrep ruleset and print its sha256 pin
 make pre-pr   # fmt, then verify, then scan — the PR gate in one command
 make app      # assemble dist/Splash.app
 ```
 
 `make pre-pr` is the gate in one command (`fmt` first, because it rewrites what
 `lint` then checks). `make scan` is **mandatory before opening a pull request** (and before marking
-one ready). It runs `semgrep scan --config auto --error .`, `qlty check --sample 5`,
-`shellcheck Scripts/*.sh` and `gitleaks` over both history and working tree, needs
-`semgrep`, `qlty` and `gitleaks` on `PATH`
-(`brew install semgrep qlty gitleaks`; qlty reads the committed
-`.qlty/qlty.toml`), and takes a couple of minutes — the slow part is `semgrep`
-fetching its ruleset. A finding is new
-drift: fix it, or suppress that one line with a reason (`# nosec <id>` for
-bandit, `# nosemgrep` for semgrep) — never by widening the config or deleting a
-plugin.
+one ready). `Scripts/scan.sh` runs `semgrep`, `qlty check --all`,
+`shellcheck Scripts/*.sh` and `gitleaks` over both history and working tree; the
+PR workflow runs that same script, plus `make lint`, on every pull request with
+the scanner versions pinned in the workflow. Locally it needs `semgrep`, `qlty`
+and `gitleaks` on `PATH` (`brew install semgrep qlty gitleaks`; qlty reads the
+committed `.qlty/qlty.toml`), and takes about a minute. A finding is new drift:
+fix it, or suppress that one line with a reason (`# nosemgrep` for semgrep) —
+never by widening the config or deleting a plugin.
+
+The semgrep ruleset is not vendored: the Semgrep Rules License forbids
+redistributing the rules. `Scripts/scan.sh` downloads it and checks the sha256
+pinned at the top of that file, so a green run cannot turn red because a rule
+changed upstream. When upstream does change, the scan stops with the new hash:
+read the new rules, run `make scan-rules`, commit the pin.
 
 `make lint` is expected to be clean: the DTOs carry the server's snake_case JSON keys in explicit `CodingKeys` rather than in property names, so the formatter never fights the wire schema. Any warning it emits is new drift to fix, not a baseline to tolerate.
 
