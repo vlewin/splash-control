@@ -400,9 +400,9 @@ struct SettingsView: View {
         // Recurrent State Format (splash 1.3.2+)
         formRow(
           "Recurrent State Format",
-          "FP32 default · BF16 halves GDN state RAM and SSD cache footprint",
+          "FP32 default · BF16 halves running-request state RAM",
           help:
-            "Format for recurrent state storage (--state-format). bf16 halves each state's size, doubling state capacity in RAM and the SSD cache."
+            "Format for running requests' recurrent state (--state-format). bf16 halves each state's size, doubling how many fit in RAM. From splash 1.7.0 cached states store INT8 codes in either format unless --cached-states exact is passed."
         ) {
           Picker(
             "",
@@ -589,7 +589,7 @@ struct SettingsView: View {
           ? "All rows — reproducible output"
           : "Auto — a learned budget, faster",
         help:
-          "Rows of each draft block the engine decodes verifies (--verify-rows). auto is faster but a MoE model's greedy output then differs run to run; all repeats. splash 1.4.0+."
+          "Rows of each draft block the engine decodes verifies (--verify-rows). auto is faster but greedy output then differs run to run; all repeats. splash 1.4.0+; from 1.7.0 it applies to every model, not only ones whose experts stream."
       ) {
         Picker(
           "",

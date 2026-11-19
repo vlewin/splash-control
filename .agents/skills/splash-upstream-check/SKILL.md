@@ -48,11 +48,24 @@ what is behaviour-only vs internal. Produces a report, never code changes.
      `PROTOCOL_VERSION` (native engine↔server wire, internal).
    - `server/backend.py` `status()` — transport wrapper and engine-JSON
      passthrough (proves a key reaches HTTP, short of a live probe).
+   - `server/frontend.py` — root-level keys the server writes into the status
+     dict itself. 1.7.0's `reasoning_effort` exists only here
+     (`status["reasoning_effort"] = self.reasoning_effort`); `Status.cpp` and
+     `backend.py` both miss it.
 3. Flag delta, stated as a table, never as prose:
    ```bash
    for t in <OLD> <NEW>; do git show "${t}:server/serve_options.py" | rg -o '"--[a-z-]+' | sort -u > flags_$t.txt; done
    comm -13 flags_<OLD>.txt flags_<NEW>.txt   # new upstream flags
    comm -23 flags_<OLD>.txt flags_<NEW>.txt   # removed upstream flags
+   ```
+   `serve_options.py` is not the whole CLI: `libexec/install/launcher.py` holds
+   the options it never defines (`--model-dir`, `--mmproj`, `--revision`,
+   `--draft-model`, `--language-only`, `--offline`, …). When both releases are
+   installed, the authoritative list is `serve --help` from each one's own
+   launcher, which is also what the tray's `probeServeFlags` reads:
+   ```bash
+   <cellar>/<tag>/libexec/python/bin/python3 \
+     <cellar>/<tag>/libexec/install/launcher.py serve --help | rg -o '\-\-[a-z-]+' | sort -u
    ```
    Then cross-check against what the tray actually emits
    (`Sources/SplashControl/SplashProcess.swift` `buildLaunchArgs`, `gatedFlags`)
@@ -70,6 +83,7 @@ what is behaviour-only vs internal. Produces a report, never code changes.
      for f in server/diagnostics.py server/tokenization.py; do
        git show "${t}:$f" | rg -o '"[a-z_0-9]+":' | tr -d '":'
      done
+     git show "${t}:server/frontend.py" | rg -o 'status\["[a-z_0-9]+"\]' | sed 's/status\["//;s/"\]//'
    done | sort -u > keys_$t.txt
    comm -13 keys_<OLD>.txt keys_<NEW>.txt   # additive keys
    comm -23 keys_<OLD>.txt keys_<NEW>.txt   # removed keys → BREAKING
@@ -79,6 +93,14 @@ what is behaviour-only vs internal. Produces a report, never code changes.
    hundreds before believing `comm`. The set loses section paths (`evictions`
    under `tokenizer_cache` cannot be told from an engine `evictions`), so confirm
    a new key's container against the release notes or a capture.
+   Table-driven keys are invisible to a per-literal grep: 1.7.0's
+   `metrics.ttft_parts_ms.unit_wait` is a name in `kTtftPartNames`
+   (`runtime/engine/RuntimeMetrics.hpp`), not a `.field("…")` call. The cheap
+   cross-check is the engine golden, fetched at both tags:
+   ```bash
+   gh api 'repos/incoai/splash/contents/dev/tests/engine/status_golden.json?ref=<TAG>' --jq '.content' | base64 -d
+   ```
+   Diff its key sets too, and add any table-driven name the source grep missed.
    Removed or renamed keys are the only schema break; additive keys are display
    candidates. Key-walk `Tests/Fixtures/status_schema*.json` against
    `Sources/SplashControlKit/StatusDTO.swift` for DTO gaps, and note pre-existing

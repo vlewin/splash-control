@@ -1,6 +1,6 @@
 import Foundation
 
-/// Codable mirror of `GET /status` as served by splash 1.2.0–1.6.1
+/// Codable mirror of `GET /status` as served by splash 1.2.0–1.7.0
 /// (`schema_version` 6 through 8; 1.6.0 raises it to 8).
 /// Optional everywhere the server may omit a key; consumers must tolerate nils.
 /// Keys this DTO does not model yet (`latency`, `frontend`, `response_store`,
