@@ -164,6 +164,18 @@ func status161FixtureDecodes() throws {
   #expect(s.reasoningSwitch != nil)
 }
 
+@Test("1.7.0 capture decodes on the schema-8 DTO")
+func status170FixtureDecodes() throws {
+  let s = try JSONDecoder().decode(StatusDTO.self, from: try fixture("status_schema8_1_7_0.json"))
+  #expect(s.ready == true)
+  #expect(s.reasoningSwitch != nil)
+  // unit_wait is the sixth ttft part; the split is a string-keyed window map,
+  // so a new part decodes without a DTO change.
+  let parts = try #require(s.metrics?.ttftPartsMs)
+  #expect(parts["unit_wait"]?.samples != nil)
+  #expect(parts["own_prefill"] != nil)
+}
+
 @Test("1.4.1 windowed layout decodes kv.window")
 func status141WindowDecodes() throws {
   let json = """
