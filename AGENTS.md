@@ -118,6 +118,7 @@ This section accumulates concrete corrections. When corrected on your approach, 
   - Never evaluate O(N) bucketing or geometry inside Chart/ForEach mark closures — hoist once before the builder.
   - Never run an interactive git command (`rebase --continue`, `commit`, `rebase -i`) in the background: with no TTY it blocks forever on the editor. Run it in the foreground with `GIT_EDITOR=true`.
  - Never stop the `splash` server during a session — the agent session runs on it. Quitting the tray quits splash too (quit flow stops the server unless stop-on-quit is off): relaunching the tray kills the session. Only a UI-visible change (§ 11) justifies a relaunch — and even then announce it first, the user restarts splash for the agent to return.
+  - Always `git fetch` and merge `origin/main` into the PR branch immediately before creating a PR, and report the behind/ahead count so the base is checkable, not assumed.
 - *Rotation / prune test*: keep this log to ≤ 10 entries (fold durable rules into their section when it exceeds); every few weeks, delete any line whose removal would cause no mistake.
 - *Size budget*: ≤ ~320 lines / ≤ 20 KB — 2026 guidance (vLLM caps at 200/300 lines, Codex truncates at 32 KiB). New detail goes to a reference doc, not here.
 
