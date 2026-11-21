@@ -80,7 +80,10 @@ jobs:
           path: |
             ~/.local
             ~/.qlty
-          key: scanners-semgrep-1.185.0-qlty-0.671.0-gitleaks-8.30.1-shellcheck-0.11.0
+          # The -pipx suffix retires a cache saved before PIPX_HOME was pinned:
+          # it holds ~/.local but no semgrep, so a run that restored it had no
+          # engine. Bump the suffix once with any change to the install paths.
+          key: scanners-semgrep-1.185.0-qlty-0.671.0-gitleaks-8.30.1-shellcheck-0.11.0-pipx
 
       - name: Install pinned scanners
         if: steps.scanners.outputs.cache-hit != 'true'
@@ -89,6 +92,12 @@ jobs:
           bin="$HOME/.local/bin"
           dl="$RUNNER_TEMP/dl"
           mkdir -p "$bin" "$dl"
+
+          # The runner image points pipx at /opt/pipx, outside the cached paths,
+          # so a run that restored this cache found the tools but no semgrep.
+          # Install under $HOME instead, where the cache can see it.
+          export PIPX_HOME="$HOME/.local/pipx"
+          export PIPX_BIN_DIR="$bin"
 
           # sha256 of the exact asset: a release tag can be repointed, the bytes
           # cannot change without the check failing.
