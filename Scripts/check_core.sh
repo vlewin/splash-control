@@ -1329,6 +1329,14 @@ func modelCatalogChecks() {
     let installed = ModelCatalog.installed()
     checkNil("scan never returns a dot-prefixed entry",
               installed.first { $0.hasPrefix(".") || $0.contains("/.") })
+    // `packs/` and `dflash2/` sit beside the owners and are not models either;
+    // the marker check below is what keeps both out.
+    check("every scanned id holds a prepared model",
+          installed.allSatisfy {
+              FileManager.default.fileExists(
+                  atPath: root.appendingPathComponent($0)
+                      .appendingPathComponent("model.json").path)
+          }, true)
     check("scan yields owner/repo pairs",
           installed.allSatisfy { $0.split(separator: "/").count == 2 }, true)
     check("scan is sorted", installed == installed.sorted(), true)
