@@ -16,7 +16,9 @@ enum ModelCatalog {
   /// `splash serve` writes one selection symlink per model under
   /// `~/Library/Application Support/Splash/models/<owner>/<repo>[:VARIANT]`,
   /// which is the exact shape `--model` accepts. The dot-prefixed siblings
-  /// (`.install.lock`, `.metadata`, `.resolved`) are bookkeeping, not models.
+  /// (`.install.lock`, `.metadata`, `.resolved`) are bookkeeping, not models,
+  /// as are the undotted `packs/` (a native conversion cache) and `dflash2/`
+  /// (the draft vocabulary blob).
   /// Path casing matches `install/paths.py:DATA`; the volume is
   /// case-insensitive, so either spelling resolves.
   static var modelsRoot: URL {
@@ -76,6 +78,11 @@ enum ModelCatalog {
           at: owner, includingPropertiesForKeys: nil)
       else { continue }
       for model in models where !model.lastPathComponent.hasPrefix(".") {
+        // `packs/` and `dflash2/` are engine bookkeeping too, and both read as
+        // an owner. A prepared model is the one marker the server writes:
+        // `model.json`, which only a resolved target holds.
+        guard fm.fileExists(atPath: model.appendingPathComponent("model.json").path)
+        else { continue }
         ids.append("\(owner.lastPathComponent)/\(model.lastPathComponent)")
       }
     }
